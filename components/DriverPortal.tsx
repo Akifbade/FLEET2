@@ -31,6 +31,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
   };
 
   const activeJob = jobs.find(j => j.status === JobStatus.IN_PROGRESS);
+  const pendingJobs = jobs.filter(j => j.status === JobStatus.PENDING);
 
   const handleManualSync = () => {
     if (!("geolocation" in navigator)) return;
@@ -55,7 +56,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
   };
 
   useEffect(() => {
-    if ("geolocation" in navigator) {
+    if ("geolocation" in navigator && activeJob) {
       geoWatchId.current = navigator.geolocation.watchPosition(
         async (position) => {
           const now = Date.now();
@@ -75,7 +76,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
       );
     }
     return () => { if (geoWatchId.current) navigator.geolocation.clearWatch(geoWatchId.current); };
-  }, [driver.id, fleetSettings.syncSpeed]); // Re-init watch if speed setting changes
+  }, [driver.id, fleetSettings.syncSpeed, activeJob]);
 
   const handleLogSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -102,6 +103,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
 
   return (
     <div className="max-w-md mx-auto space-y-6 pb-24 px-2">
+      {/* Profile Card */}
       <div className="bg-gradient-to-br from-blue-700 to-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
         <div className="relative z-10 space-y-6">
           <div className="flex items-center justify-between">
@@ -123,7 +125,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
                <div className="flex items-center space-x-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                   <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">
-                    Syncing every {getSyncCooldown()/1000}s ({fleetSettings.syncSpeed})
+                    Sync: {fleetSettings.syncSpeed} ({getSyncCooldown()/1000}s)
                   </span>
                </div>
                <p className="text-[9px] text-white/40 font-bold uppercase tracking-widest">
@@ -134,6 +136,68 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
         </div>
       </div>
 
+      {/* New Assignments Section */}
+      {pendingJobs.length > 0 && !activeJob && (
+        <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+           <div className="flex items-center space-x-2 px-4">
+              <i className="fas fa-bell text-orange-500 text-xs"></i>
+              <h3 className="font-black text-[10px] uppercase text-gray-400 tracking-widest">New Assignments ({pendingJobs.length})</h3>
+           </div>
+           {pendingJobs.map(job => (
+             <div key={job.id} className="bg-white rounded-[2.5rem] p-8 border-2 border-orange-100 shadow-xl shadow-orange-50/50 space-y-6">
+               <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest mb-1">New Route Assigned</p>
+                    <h4 className="font-black text-gray-900 text-xl">{job.origin} <i className="fas fa-arrow-right text-gray-300 mx-2 text-sm"></i> {job.destination}</h4>
+                  </div>
+                  <div className="w-10 h-10 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-inner">
+                    <i className="fas fa-map-marked-alt"></i>
+                  </div>
+               </div>
+               <p className="text-xs text-gray-500 font-medium leading-relaxed">{job.description || 'No additional instructions provided.'}</p>
+               <button 
+                onClick={() => onUpdateJobStatus(job.id, JobStatus.IN_PROGRESS)}
+                className="w-full bg-gray-900 text-white py-6 rounded-2xl font-black uppercase tracking-widest shadow-2xl active:scale-95 transition flex items-center justify-center space-x-3"
+               >
+                 <i className="fas fa-play text-xs text-orange-500"></i>
+                 <span>Start Delivery Trip</span>
+               </button>
+             </div>
+           ))}
+        </div>
+      )}
+
+      {/* Active Trip Section */}
+      {activeJob && (
+        <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 p-8 space-y-6 animate-in slide-in-from-bottom-4">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-[11px] font-black uppercase text-blue-600 tracking-[0.2em]">Live Trip tracking</h4>
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+          </div>
+          <div className="bg-gray-50 rounded-3xl p-6 flex items-center justify-between border border-gray-100 relative">
+            <div className="text-center flex-1">
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Origin</p>
+              <p className="font-black text-gray-900 text-lg leading-tight">{activeJob.origin}</p>
+            </div>
+            <div className="px-4"><i className="fas fa-truck-moving text-blue-200 text-xl"></i></div>
+            <div className="text-center flex-1">
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Destination</p>
+              <p className="font-black text-gray-900 text-lg leading-tight">{activeJob.destination}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => onUpdateJobStatus(activeJob.id, JobStatus.COMPLETED)} 
+            className="w-full bg-red-600 text-white py-6 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-red-100 flex items-center justify-center space-x-3 active:scale-95 transition"
+          >
+             <i className="fas fa-flag-checkered text-xl"></i><span>Finish Delivery</span>
+          </button>
+        </div>
+      )}
+
+      {/* Quick Actions (Always visible) */}
       <div className="grid grid-cols-2 gap-4">
         <button onClick={() => { setLogType('FUEL'); setShowLogForm(true); }} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col items-center space-y-4 active:scale-95 transition group">
           <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-2xl group-hover:scale-110 transition shadow-sm"><i className="fas fa-gas-pump"></i></div>
@@ -145,25 +209,16 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
         </button>
       </div>
 
-      {activeJob ? (
-        <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 p-8 space-y-6 animate-in slide-in-from-bottom-4">
-          <h4 className="text-[11px] font-black uppercase text-blue-600 tracking-[0.2em] mb-4">Current Deployment</h4>
-          <div className="bg-gray-50 rounded-3xl p-6 flex items-center justify-between border border-gray-100 relative">
-            <div className="text-center flex-1"><p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Origin</p><p className="font-black text-gray-900 text-lg">{activeJob.origin}</p></div>
-            <div className="px-4"><i className="fas fa-arrow-right text-gray-200"></i></div>
-            <div className="text-center flex-1"><p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Target</p><p className="font-black text-gray-900 text-lg">{activeJob.destination}</p></div>
-          </div>
-          <button onClick={() => onUpdateJobStatus(activeJob.id, JobStatus.COMPLETED)} className="w-full bg-red-600 text-white py-6 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-red-100 flex items-center justify-center space-x-3">
-             <i className="fas fa-flag-checkered text-xl"></i><span>Finish Delivery</span>
-          </button>
-        </div>
-      ) : (
+      {/* Empty State */}
+      {!activeJob && pendingJobs.length === 0 && (
         <div className="bg-white rounded-[2.5rem] border-4 border-dashed border-gray-100 p-12 text-center">
-          <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-200"><i className="fas fa-map-location-dot text-2xl"></i></div>
-          <h4 className="font-black text-gray-300 uppercase text-[10px] tracking-[0.3em]">Awaiting Dispatch</h4>
+          <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-200 shadow-inner"><i className="fas fa-map-location-dot text-2xl"></i></div>
+          <h4 className="font-black text-gray-300 uppercase text-[10px] tracking-[0.3em]">No Active Tasks</h4>
+          <p className="text-[8px] text-gray-400 font-bold uppercase mt-2 tracking-widest">Waiting for Admin to Dispatch Job</p>
         </div>
       )}
 
+      {/* Log Form Modal */}
       {showLogForm && (
         <div className="fixed inset-0 bg-gray-900/90 backdrop-blur-md z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom">
