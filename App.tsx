@@ -7,7 +7,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Login from './components/Login';
 import { db, isConfigured } from './services/firebase';
-import { collection, onSnapshot, addDoc, updateDoc, doc, query, orderBy, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, updateDoc, doc, query, orderBy, setDoc, deleteDoc } from "firebase/firestore";
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{ role: ViewMode; id?: string } | null>(null);
@@ -39,9 +39,8 @@ const App: React.FC = () => {
 
     const unsubDrivers = onSnapshot(collection(db, "drivers"), 
       (snap) => {
-        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Driver));
+        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Driver));
         setDrivers(docs);
-        // Turn off loader once we have initial data
         setIsLoading(false);
       },
       (err) => {
@@ -51,11 +50,15 @@ const App: React.FC = () => {
     );
 
     const unsubJobs = onSnapshot(query(collection(db, "jobs"), orderBy("assignedAt", "desc")), 
-      (snap) => setJobs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)))
+      (snap) => {
+        // CRITICAL FIX: Ensure document ID (d.id) overwrites any 'id' inside data
+        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Job));
+        setJobs(docs);
+      }
     );
 
     const unsubReceipts = onSnapshot(query(collection(db, "receipts"), orderBy("date", "desc")), 
-      (snap) => setReceipts(snap.docs.map(d => ({ id: d.id, ...d.data() } as ReceiptEntry)))
+      (snap) => setReceipts(snap.docs.map(d => ({ ...d.data(), id: d.id } as ReceiptEntry)))
     );
 
     return () => { unsubSettings(); unsubDrivers(); unsubJobs(); unsubReceipts(); };
@@ -84,7 +87,11 @@ const App: React.FC = () => {
 
   const handleAddJob = async (newJob: Job) => {
     if (!db) return;
-    try { await addDoc(collection(db, "jobs"), newJob); } 
+    try { 
+      // We don't need to pass id here, Firestore creates its own
+      const { id, ...jobData } = newJob;
+      await addDoc(collection(db, "jobs"), jobData); 
+    } 
     catch (e) { console.error(e); }
   };
 
@@ -108,20 +115,31 @@ const App: React.FC = () => {
 
   const handleUpdateJobStatus = async (jobId: string, status: JobStatus) => {
     if (!db) return;
+    console.log(`Attempting to update job ${jobId} to ${status}`);
     try {
       const jobRef = doc(db, "jobs", jobId);
       const updates: any = { status };
       const targetJob = jobs.find(j => j.id === jobId);
-      if (!targetJob) return;
+      
+      if (!targetJob) {
+        console.error("Job not found in local state:", jobId);
+        return;
+      }
 
       if (status === JobStatus.IN_PROGRESS) updates.startTime = new Date().toISOString();
       if (status === JobStatus.COMPLETED) updates.endTime = new Date().toISOString();
 
       await updateDoc(jobRef, updates);
+      
+      // Update associated driver status
       await updateDoc(doc(db, "drivers", targetJob.driverId), { 
         status: status === JobStatus.IN_PROGRESS ? 'ON_JOB' : 'ONLINE' 
       });
-    } catch (e) { console.error(e); }
+      console.log("Job status updated successfully");
+    } catch (e) { 
+      console.error("Error updating job status:", e);
+      alert("Failed to update trip status. Please check connection.");
+    }
   };
 
   const handleLogReceipt = async (entry: ReceiptEntry) => {
@@ -130,7 +148,6 @@ const App: React.FC = () => {
     catch (e) { console.error(e); }
   };
 
-  // Show a loading screen until the app checks for existing login and drivers
   if (isLoading) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#0a0a0b]">
@@ -145,7 +162,6 @@ const App: React.FC = () => {
 
   if (!user) return <Login onLogin={handleLogin} drivers={drivers} logoUrl={LOGO_URL} />;
 
-  // Find the current logged in driver if applicable
   const currentDriver = user.role === 'DRIVER' ? drivers.find(d => d.id === user.id) : null;
 
   return (
@@ -165,7 +181,6 @@ const App: React.FC = () => {
             onDeleteDriver={handleDeleteDriver}
           />
         ) : (
-          // Only render DriverPortal if the driver data exists in the fetched list
           currentDriver ? (
             <DriverPortal 
               driver={currentDriver} 
@@ -178,7 +193,7 @@ const App: React.FC = () => {
             <div className="flex flex-col items-center justify-center p-20 text-center space-y-4">
                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-3xl"><i className="fas fa-user-slash"></i></div>
                <h2 className="font-black text-gray-900 uppercase tracking-tight">Driver Not Found</h2>
-               <p className="text-gray-500 text-sm max-w-xs">Your driver account might have been deleted from the terminal. Please contact the Fleet Manager.</p>
+               <p className="text-gray-500 text-sm max-w-xs">Your driver account might have been deleted. Contact HQ.</p>
                <button onClick={handleLogout} className="text-blue-600 font-black text-xs uppercase tracking-widest bg-blue-50 px-6 py-3 rounded-xl border border-blue-100">Return to Login</button>
             </div>
           )
