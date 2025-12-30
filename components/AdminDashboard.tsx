@@ -33,6 +33,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [showEditDriverModal, setShowEditDriverModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [selectedJobForRadar, setSelectedJobForRadar] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [addressMap, setAddressMap] = useState<Record<string, string>>({});
 
@@ -76,6 +77,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     resolveAddresses();
   }, [jobs]);
 
+  const activeMissions = jobs.filter(j => j.status === JobStatus.IN_PROGRESS);
   const completedJobs = jobs.filter(j => j.status === JobStatus.COMPLETED);
   const totalKm = completedJobs.reduce((acc, curr) => acc + (curr.distanceKm || 0), 0);
   const avgFleetSpeed = Math.round(completedJobs.reduce((acc, curr) => acc + (curr.avgSpeed || 0), 0) / (completedJobs.length || 1));
@@ -97,13 +99,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const selectedDriver = drivers.find(d => d.id === selectedDriverId);
-  const driverJobs = jobs.filter(j => j.driverId === selectedDriverId);
-  const driverReceipts = fuelEntries.filter(r => r.driverId === selectedDriverId);
-  const driverTotalKm = parseFloat(driverJobs.filter(j => j.status === JobStatus.COMPLETED).reduce((acc, j) => acc + (j.distanceKm || 0), 0).toFixed(2));
+  // Fix: Calculate stats for the selected driver detail modal
+  const driverJobs = selectedDriver ? jobs.filter(j => j.driverId === selectedDriver.id) : [];
+  const driverTotalKm = driverJobs.filter(j => j.status === JobStatus.COMPLETED).reduce((acc, curr) => acc + (curr.distanceKm || 0), 0);
+  const driverReceipts = selectedDriver ? fuelEntries.filter(r => r.driverId === selectedDriver.id) : [];
+
+  const radarJob = jobs.find(j => j.id === selectedJobForRadar);
+  const radarDriver = drivers.find(d => d.id === radarJob?.driverId);
 
   return (
     <div className="space-y-6">
-      {/* Dynamic Header */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 gap-4">
         <div>
           <h2 className="font-black text-gray-900 text-3xl tracking-tighter uppercase">QGO Master Console</h2>
@@ -120,7 +126,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Analytics Grid */}
+      {/* Analytics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Active Fleet', value: drivers.length, icon: 'fa-truck', color: 'bg-blue-50 text-blue-600' },
@@ -156,13 +162,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {jobs.slice(0, 5).map(job => (
                     <div key={job.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
                       <div className="flex items-center space-x-4">
-                        <div className={`w-2 h-2 rounded-full ${job.status === JobStatus.IN_PROGRESS ? 'bg-orange-500 animate-pulse' : 'bg-blue-500'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${job.status === JobStatus.IN_PROGRESS ? 'bg-emerald-500 animate-pulse' : job.status === JobStatus.PENDING ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
                         <div>
                           <p className="text-xs font-black text-gray-900">{job.origin} → {job.destination}</p>
                           <p className="text-[10px] text-gray-400 font-bold uppercase">{job.tripType} • {drivers.find(d => d.id === job.driverId)?.name}</p>
                         </div>
                       </div>
-                      <span className="text-[10px] font-black text-gray-500 uppercase">{job.status}</span>
+                      <div className="flex items-center space-x-3">
+                         <span className="text-[10px] font-black text-gray-500 uppercase">{job.status}</span>
+                         {job.status === JobStatus.IN_PROGRESS && (
+                           <button 
+                             onClick={() => { setSelectedJobForRadar(job.id); setActiveTab('MAP'); }}
+                             className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-100 hover:bg-emerald-600 hover:text-white transition"
+                           >
+                             Live Track
+                           </button>
+                         )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -188,7 +204,120 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {activeTab === 'MAP' && <div className="h-[650px] bg-white rounded-[3rem] overflow-hidden border border-gray-100 shadow-inner"><LiveMap drivers={drivers} /></div>}
+      {activeTab === 'MAP' && (
+        <div className="h-[700px] bg-white rounded-[3rem] overflow-hidden border border-gray-100 shadow-inner relative">
+          <LiveMap 
+            drivers={drivers} 
+            selectedJobId={selectedJobForRadar} 
+            route={radarJob?.route || []}
+          />
+          
+          {/* Active Missions Sidebar on Map */}
+          <div className="absolute top-6 right-6 z-[1000] w-72 space-y-4 pointer-events-none">
+             <div className="bg-white/95 backdrop-blur-xl p-5 rounded-[2rem] border border-gray-100 shadow-2xl pointer-events-auto max-h-[600px] overflow-y-auto scrollbar-hide">
+                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 border-b border-gray-100 pb-2 flex justify-between">
+                   <span>Active Missions</span>
+                   <span className="text-emerald-500">{activeMissions.length} Live</span>
+                </h4>
+                <div className="space-y-3">
+                   {activeMissions.length === 0 ? (
+                     <p className="text-[9px] font-black text-gray-300 uppercase text-center py-4 italic">No ongoing trips</p>
+                   ) : activeMissions.map(j => (
+                     <button 
+                       key={j.id} 
+                       onClick={() => setSelectedJobForRadar(j.id)}
+                       className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedJobForRadar === j.id ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-gray-50 border-gray-100 text-gray-800 hover:border-blue-200'}`}
+                     >
+                        <div className="flex justify-between items-start mb-2">
+                           <span className="text-[8px] font-black uppercase tracking-widest opacity-70">Unit: {drivers.find(d => d.id === j.driverId)?.vehicleNo}</span>
+                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        </div>
+                        <p className="text-[11px] font-black truncate">{j.origin} → {j.destination}</p>
+                        {selectedJobForRadar === j.id && (
+                           <div className="mt-3 pt-3 border-t border-white/20 grid grid-cols-2 gap-2">
+                              <div>
+                                 <p className="text-[7px] uppercase font-black opacity-70">Live Speed</p>
+                                 <p className="text-xs font-black">{drivers.find(d => d.id === j.driverId)?.lastKnownLocation?.speed || 0} KM/H</p>
+                              </div>
+                              <div className="text-right">
+                                 <p className="text-[7px] uppercase font-black opacity-70">Duration</p>
+                                 <p className="text-xs font-black">{Math.floor((Date.now() - new Date(j.startTime!).getTime()) / 60000)}m</p>
+                              </div>
+                           </div>
+                        )}
+                     </button>
+                   ))}
+                </div>
+                {selectedJobForRadar && (
+                  <button 
+                    onClick={() => setSelectedJobForRadar(null)}
+                    className="w-full mt-4 py-3 bg-rose-50 text-rose-600 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-600 hover:text-white transition border border-rose-100"
+                  >
+                    Close Radar View
+                  </button>
+                )}
+             </div>
+          </div>
+
+          {/* Radar Telemetry HUD */}
+          {selectedJobForRadar && radarJob && radarDriver && (
+            <div className="absolute bottom-10 left-10 z-[1000] pointer-events-none w-full max-w-sm">
+               <div className="bg-slate-900/95 backdrop-blur-2xl rounded-[2.5rem] p-8 text-white shadow-2xl border border-white/10 pointer-events-auto animate-in slide-in-from-left-8">
+                  <div className="flex justify-between items-start mb-6">
+                     <div>
+                        <h4 className="text-2xl font-black tracking-tight">{radarDriver.name}</h4>
+                        <p className="text-blue-400 text-[9px] font-black uppercase tracking-widest">{radarDriver.vehicleNo} • Mission ID: {radarJob.id}</p>
+                     </div>
+                     <div className="text-right">
+                        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[8px] font-black uppercase tracking-widest">
+                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                           <span>Real-time Connection</span>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-6 mb-8">
+                     <div className="text-center">
+                        <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Velocity</p>
+                        <div className="flex items-baseline justify-center">
+                           <span className="text-3xl font-black text-white">{Math.round(radarDriver.lastKnownLocation?.speed || 0)}</span>
+                           <span className="text-[8px] font-black text-gray-400 ml-1">K/H</span>
+                        </div>
+                     </div>
+                     <div className="text-center border-x border-white/5">
+                        <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Path Log</p>
+                        <div className="flex items-baseline justify-center">
+                           <span className="text-3xl font-black text-blue-400">{radarJob.route?.length || 0}</span>
+                           <span className="text-[8px] font-black text-gray-400 ml-1">PTS</span>
+                        </div>
+                     </div>
+                     <div className="text-center">
+                        <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Elapsed</p>
+                        <div className="flex items-baseline justify-center">
+                           <span className="text-3xl font-black text-white">{Math.floor((Date.now() - new Date(radarJob.startTime!).getTime()) / 60000)}</span>
+                           <span className="text-[8px] font-black text-gray-400 ml-1">MIN</span>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
+                     <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest mb-4">
+                        <span className="text-gray-500">Route Progress</span>
+                        <span className="text-blue-400">Synchronized</span>
+                     </div>
+                     <div className="relative h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div className="absolute top-0 left-0 h-full bg-blue-500 w-[65%] shadow-[0_0_15px_#3b82f6]"></div>
+                     </div>
+                     <div className="mt-4 flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase italic">
+                        <span>{radarJob.origin}</span>
+                        <span>{radarJob.destination}</span>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {activeTab === 'REPORTS' && (
         <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden animate-in fade-in duration-500">
@@ -201,9 +330,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  <tr>
                    <th className="px-8 py-5">Job Details</th>
                    <th className="px-8 py-5 text-center">KM / Speed</th>
-                   <th className="px-8 py-5">Location Details</th>
                    <th className="px-8 py-5">Timeline</th>
-                   <th className="px-8 py-5 text-right">Manifest</th>
+                   <th className="px-8 py-5 text-right">Route Replay</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-gray-100">
@@ -226,27 +354,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                      </td>
                      <td className="px-8 py-6">
-                        <div className="space-y-2">
-                           <div className="flex items-center space-x-2 text-[10px] font-black text-emerald-600 uppercase">
-                             <i className="fas fa-location-dot"></i>
-                             <span>{addressMap[`${job.startLocation?.lat},${job.startLocation?.lng}`] || 'Origin Hub'}</span>
-                           </div>
-                           <div className="flex items-center space-x-2 text-[10px] font-black text-rose-500 uppercase">
-                             <i className="fas fa-location-arrow"></i>
-                             <span>{addressMap[`${job.endLocation?.lat},${job.endLocation?.lng}`] || 'Target Hub'}</span>
-                           </div>
-                        </div>
-                     </td>
-                     <td className="px-8 py-6">
                         <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest space-y-1">
                            <div className="flex justify-between w-32"><span>UP:</span> <span className="text-gray-900">{new Date(job.startTime!).toLocaleTimeString()}</span></div>
                            <div className="flex justify-between w-32"><span>OFF:</span> <span className="text-gray-900">{new Date(job.endTime!).toLocaleTimeString()}</span></div>
                         </div>
                      </td>
                      <td className="px-8 py-6 text-right">
-                        {job.attachmentUrl ? (
-                          <a href={job.attachmentUrl} target="_blank" className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 border border-blue-100 ml-auto"><i className="fas fa-file-pdf"></i></a>
-                        ) : <span className="text-[9px] font-black text-gray-300 uppercase italic">N/A</span>}
+                        <button 
+                          onClick={() => { setSelectedJobForRadar(job.id); setActiveTab('MAP'); }}
+                          className="bg-blue-600 text-white px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-200 hover:bg-slate-900 transition"
+                        >
+                          View Replay
+                        </button>
                      </td>
                    </tr>
                  ))}
@@ -340,22 +459,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1">Status: Success</p>
                                    </div>
                                 </div>
-                                
-                                <div className="bg-gray-50 rounded-3xl p-6 space-y-4 border border-gray-100">
-                                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2">Mission Telemetry</p>
-                                   <div className="flex justify-between items-center text-xs font-bold">
-                                      <span className="text-gray-400">Duty Started</span>
-                                      <span className="text-gray-900">{new Date(job.startTime!).toLocaleTimeString()} ({addressMap[`${job.startLocation?.lat},${job.startLocation?.lng}`] || 'Origin Hub'})</span>
-                                   </div>
-                                   <div className="flex justify-between items-center text-xs font-bold">
-                                      <span className="text-gray-400">Avg Velocity</span>
-                                      <span className="text-gray-900">{job.avgSpeed || 0} KM/H</span>
-                                   </div>
-                                   <div className="flex justify-between items-center text-xs font-bold">
-                                      <span className="text-gray-400">Final Arrival</span>
-                                      <span className="text-gray-900">{new Date(job.endTime!).toLocaleTimeString()} ({addressMap[`${job.endLocation?.lat},${job.endLocation?.lng}`] || 'Target Terminal'})</span>
-                                   </div>
-                                </div>
+                                <button 
+                                  onClick={() => { setSelectedJobForRadar(job.id); setSelectedDriverId(null); setActiveTab('MAP'); }}
+                                  className="w-full mt-4 py-4 bg-gray-50 text-gray-900 text-[10px] font-black uppercase tracking-widest rounded-2xl border border-gray-100 hover:bg-blue-600 hover:text-white transition"
+                                >
+                                  Replay Route on Map
+                                </button>
                              </div>
                           ))}
                        </div>
@@ -400,7 +509,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* DELETE CONFIRMATION MODAL */}
+      {/* DELETE CONFIRMATION */}
       {showDeleteConfirm && selectedDriver && (
         <div className="fixed inset-0 bg-rose-900/95 backdrop-blur-xl z-[400] flex items-center justify-center p-4">
            <div className="bg-white max-w-md w-full rounded-[3rem] p-10 text-center shadow-2xl animate-in zoom-in-95 duration-200">
@@ -421,7 +530,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* EDIT DRIVER MODAL */}
+      {/* EDIT DRIVER */}
       {showEditDriverModal && editDriverData && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[400] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
@@ -448,7 +557,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* MODALS */}
+      {/* DISPATCH MODAL */}
       {showJobModal && (
         <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[200] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xl rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
@@ -481,6 +590,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {/* REGISTRATION MODAL */}
       {showDriverModal && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[200] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl">
