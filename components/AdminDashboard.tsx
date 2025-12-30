@@ -27,6 +27,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [aiInsight, setAiInsight] = useState<string>('Analyzing fleet velocity and efficiency...');
   const [showJobModal, setShowJobModal] = useState(false);
   const [showDriverModal, setShowDriverModal] = useState(false);
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const [newJob, setNewJob] = useState({ 
@@ -52,6 +53,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const selectedDriver = drivers.find(d => d.id === selectedDriverId);
+  const driverJobs = jobs.filter(j => j.driverId === selectedDriverId);
+  const driverReceipts = fuelEntries.filter(r => r.driverId === selectedDriverId);
+  const driverTotalKm = driverJobs.filter(j => j.status === JobStatus.COMPLETED).reduce((acc, j) => acc + (j.distanceKm || 0), 0);
+  const driverFuelCount = driverReceipts.filter(r => r.type === 'FUEL').length;
+
   return (
     <div className="space-y-6">
       {/* Dynamic Header */}
@@ -71,7 +78,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Analytics High-Density Grid */}
+      {/* Analytics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Active Fleet', value: drivers.length, icon: 'fa-truck', color: 'bg-blue-50 text-blue-600' },
@@ -87,7 +94,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         ))}
       </div>
 
-      {/* Professional Navigation Tabs */}
+      {/* Tabs */}
       <div className="flex space-x-2 bg-gray-100/50 p-1.5 rounded-3xl overflow-x-auto scrollbar-hide">
         {(['OVERVIEW', 'MAP', 'REPORTS', 'DRIVERS', 'AI'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-white text-gray-900 shadow-md' : 'text-gray-400 hover:text-gray-700'}`}>
@@ -96,7 +103,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         ))}
       </div>
 
-      {/* Main Content Areas */}
+      {/* Tab Content */}
       {activeTab === 'OVERVIEW' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
            <div className="lg:col-span-2"><DriverPerformance drivers={drivers} jobs={jobs} receipts={fuelEntries} /></div>
@@ -131,7 +138,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                <h3 className="font-black text-gray-900 uppercase tracking-tight">Enterprise Logistics Ledger</h3>
                <p className="text-[9px] text-gray-400 font-bold uppercase mt-1 tracking-widest">Digital Proof of Deliveries</p>
              </div>
-             <button className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest">Download master log</button>
+             <button className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest">Export Excel</button>
            </div>
            <div className="overflow-x-auto">
              <table className="w-full text-left">
@@ -145,31 +152,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  </tr>
                </thead>
                <tbody className="divide-y divide-gray-100">
-                 {completedJobs.length === 0 ? (
-                    <tr><td colSpan={5} className="py-20 text-center text-gray-300 font-black uppercase text-sm italic">No completed records yet</td></tr>
-                 ) : completedJobs.map(job => (
+                 {completedJobs.map(job => (
                    <tr key={job.id} className="hover:bg-blue-50/30 transition-colors">
                      <td className="px-8 py-6">
                         <div className="flex items-center space-x-3 mb-2">
-                          <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest">{job.tripType}</span>
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest leading-none flex items-center h-5">{job.tripType}</span>
                           <span className="font-black text-gray-900 text-xs">ID: {job.id}</span>
                         </div>
-                        <p className="font-black text-gray-800 text-sm">{job.origin} <i className="fas fa-arrow-right mx-2 text-gray-300"></i> {job.destination}</p>
-                        <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-wider">{drivers.find(d => d.id === job.driverId)?.name}</p>
+                        <p className="font-black text-gray-800 text-sm leading-none flex items-center">
+                          {job.origin} <i className="fas fa-arrow-right mx-2 text-gray-300 text-[10px]"></i> {job.destination}
+                        </p>
+                        <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-wider">{drivers.find(d => d.id === job.driverId)?.name}</p>
                      </td>
                      <td className="px-8 py-6 text-center">
-                        <div className="flex flex-col space-y-1">
-                          <span className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full text-[10px] font-black border border-indigo-100">{job.distanceKm || 0} KM</span>
+                        <div className="flex flex-col space-y-1 items-center">
+                          <span className="bg-blue-50 text-blue-600 px-6 py-2 rounded-full text-[10px] font-black border border-blue-100 shadow-sm w-max">{job.distanceKm || 0} KM</span>
                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{job.avgSpeed || 0} KM/H AVG</span>
                         </div>
                      </td>
                      <td className="px-8 py-6">
                         <div className="space-y-1.5">
-                           <div className="flex items-center space-x-2 text-[9px] font-black text-emerald-600 uppercase">
+                           <div className="flex items-center space-x-2 text-[10px] font-black text-emerald-600 uppercase">
                              <i className="fas fa-location-dot"></i>
                              <span>S: {job.startLocation?.lat.toFixed(4)}, {job.startLocation?.lng.toFixed(4)}</span>
                            </div>
-                           <div className="flex items-center space-x-2 text-[9px] font-black text-rose-500 uppercase">
+                           <div className="flex items-center space-x-2 text-[10px] font-black text-rose-500 uppercase">
                              <i className="fas fa-location-arrow"></i>
                              <span>E: {job.endLocation?.lat.toFixed(4)}, {job.endLocation?.lng.toFixed(4)}</span>
                            </div>
@@ -177,13 +184,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                      </td>
                      <td className="px-8 py-6">
                         <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-relaxed">
-                           <div>UP: {new Date(job.startTime!).toLocaleTimeString()}</div>
-                           <div>OFF: {new Date(job.endTime!).toLocaleTimeString()}</div>
+                           <div className="flex justify-between w-32"><span>UP:</span> <span className="text-gray-900">{new Date(job.startTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></div>
+                           <div className="flex justify-between w-32"><span>OFF:</span> <span className="text-gray-900">{new Date(job.endTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></div>
                         </div>
                      </td>
                      <td className="px-8 py-6 text-right">
                         {job.attachmentUrl ? (
-                          <a href={job.attachmentUrl} target="_blank" className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100 mx-auto">
+                          <a href={job.attachmentUrl} target="_blank" className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100 ml-auto">
                             <i className="fas fa-file-pdf"></i>
                           </a>
                         ) : <span className="text-[9px] font-black text-gray-300 uppercase italic">N/A</span>}
@@ -198,25 +205,155 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {activeTab === 'DRIVERS' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {drivers.map(driver => (
-            <div key={driver.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden group hover:shadow-xl transition-all">
-              <div className={`absolute top-0 right-0 w-3 h-full ${driver.status === 'ONLINE' ? 'bg-emerald-500' : driver.status === 'ON_JOB' ? 'bg-orange-500' : 'bg-gray-200'}`}></div>
-              <h3 className="font-black text-gray-900 uppercase tracking-tight text-xl">{driver.name}</h3>
-              <p className="text-blue-600 text-[10px] font-black uppercase tracking-widest mb-6">{driver.vehicleNo}</p>
-              <div className="bg-gray-50 p-5 rounded-2xl mb-6 space-y-3 border border-gray-100">
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest border-b border-gray-200 pb-2">Unit Credentials</p>
-                <div className="flex justify-between text-xs font-black"><span>ID</span><span className="text-gray-900">{driver.id}</span></div>
-                <div className="flex justify-between text-xs font-black"><span>PIN</span><span className="text-gray-900">{driver.password}</span></div>
+          {drivers.map(driver => {
+            const dJobs = jobs.filter(j => j.driverId === driver.id && j.status === JobStatus.COMPLETED);
+            const dKm = dJobs.reduce((acc, j) => acc + (j.distanceKm || 0), 0);
+            return (
+              <div key={driver.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden group hover:shadow-xl transition-all cursor-pointer" onClick={() => setSelectedDriverId(driver.id)}>
+                <div className={`absolute top-0 right-0 w-3 h-full ${driver.status === 'ONLINE' ? 'bg-emerald-500' : driver.status === 'ON_JOB' ? 'bg-orange-500' : 'bg-gray-200'}`}></div>
+                <h3 className="font-black text-gray-900 uppercase tracking-tight text-xl">{driver.name}</h3>
+                <p className="text-blue-600 text-[10px] font-black uppercase tracking-widest mb-6">{driver.vehicleNo}</p>
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                   <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Odometer</p>
+                      <p className="text-sm font-black text-gray-900">{dKm} KM</p>
+                   </div>
+                   <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Trips</p>
+                      <p className="text-sm font-black text-gray-900">{dJobs.length}</p>
+                   </div>
+                </div>
+                <button className="w-full py-4 bg-gray-900 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-600 transition shadow-lg">View Full Dossier</button>
               </div>
-              <button onClick={() => onDeleteDriver(driver.id)} className="w-full py-4 bg-rose-50 text-rose-600 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-600 hover:text-white transition">Decommission Unit</button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {activeTab === 'AI' && <div className="bg-white rounded-[2.5rem] p-12 border border-gray-100 text-gray-700 leading-relaxed text-lg font-medium whitespace-pre-wrap animate-in slide-in-from-bottom-4">{aiInsight}</div>}
 
-      {/* Professional Job Dispatch Modal */}
+      {/* Driver Detail Profile Modal */}
+      {selectedDriverId && selectedDriver && (
+        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[300] flex items-center justify-center p-4">
+           <div className="bg-white w-full max-w-4xl rounded-[3rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+              <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                 <div className="flex items-center space-x-5">
+                    <div className="w-20 h-20 rounded-[2rem] bg-slate-900 text-white flex items-center justify-center text-3xl font-black">
+                       {selectedDriver.name.charAt(0)}
+                    </div>
+                    <div>
+                       <h3 className="font-black text-gray-900 uppercase text-3xl tracking-tighter">{selectedDriver.name}</h3>
+                       <p className="text-blue-600 font-black uppercase text-xs tracking-widest">{selectedDriver.vehicleNo} • Unit ID: {selectedDriver.id}</p>
+                    </div>
+                 </div>
+                 <button onClick={() => setSelectedDriverId(null)} className="text-gray-300 hover:text-rose-500 transition text-4xl"><i className="fas fa-times-circle"></i></button>
+              </div>
+              
+              <div className="flex-grow overflow-y-auto p-8 space-y-10 scrollbar-hide">
+                 {/* Top Level KPIs */}
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100">
+                       <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Total Distance</p>
+                       <h4 className="text-3xl font-black text-blue-900">{driverTotalKm} KM</h4>
+                    </div>
+                    <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100">
+                       <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Deliveries</p>
+                       <h4 className="text-3xl font-black text-emerald-900">{driverJobs.filter(j => j.status === JobStatus.COMPLETED).length}</h4>
+                    </div>
+                    <div className="bg-orange-50 p-6 rounded-[2rem] border border-orange-100">
+                       <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1">Fuel Refills</p>
+                       <h4 className="text-3xl font-black text-orange-900">{driverFuelCount}</h4>
+                    </div>
+                    <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100">
+                       <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Total Expenses</p>
+                       <h4 className="text-3xl font-black text-indigo-900">₹{driverReceipts.reduce((acc, r) => acc + r.amount, 0)}</h4>
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                    {/* Fuel Ledger */}
+                    <div className="space-y-4">
+                       <div className="flex justify-between items-end">
+                          <h5 className="font-black uppercase text-gray-900 tracking-tight">Financial Ledger</h5>
+                          <span className="text-[9px] font-black text-gray-400 uppercase">Recent Activity</span>
+                       </div>
+                       <div className="bg-gray-50 rounded-[2rem] border border-gray-100 overflow-hidden">
+                          {driverReceipts.length === 0 ? (
+                             <div className="p-10 text-center text-gray-400 font-bold text-xs uppercase italic">No records found</div>
+                          ) : (
+                             <table className="w-full text-left text-xs">
+                                <thead className="bg-white/50 font-black text-gray-400 uppercase tracking-widest border-b border-gray-200/50">
+                                   <tr>
+                                      <th className="px-6 py-4">Date</th>
+                                      <th className="px-6 py-4">Ref</th>
+                                      <th className="px-6 py-4 text-right">Amount</th>
+                                   </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                   {driverReceipts.map(r => (
+                                      <tr key={r.id} className="hover:bg-white transition-colors">
+                                         <td className="px-6 py-4 font-bold text-gray-500">{new Date(r.date).toLocaleDateString()}</td>
+                                         <td className="px-6 py-4">
+                                            <span className={`px-2 py-0.5 rounded-full font-black text-[8px] uppercase ${r.type === 'FUEL' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{r.type}</span>
+                                         </td>
+                                         <td className="px-6 py-4 text-right font-black text-gray-900">₹{r.amount}</td>
+                                      </tr>
+                                   ))}
+                                </tbody>
+                             </table>
+                          )}
+                       </div>
+                    </div>
+
+                    {/* Trip Log */}
+                    <div className="space-y-4">
+                       <div className="flex justify-between items-end">
+                          <h5 className="font-black uppercase text-gray-900 tracking-tight">Mission History</h5>
+                          <span className="text-[9px] font-black text-gray-400 uppercase">Per-Trip Distance</span>
+                       </div>
+                       <div className="space-y-3">
+                          {driverJobs.filter(j => j.status === JobStatus.COMPLETED).slice(0, 5).map(job => (
+                             <div key={job.id} className="bg-white border border-gray-100 p-5 rounded-2xl shadow-sm flex justify-between items-center group hover:border-blue-200 transition">
+                                <div>
+                                   <p className="text-[10px] font-black text-blue-600 uppercase mb-1">{job.tripType}</p>
+                                   <p className="text-xs font-black text-gray-900">{job.origin} <i className="fas fa-arrow-right mx-2 text-gray-300"></i> {job.destination}</p>
+                                   <p className="text-[9px] text-gray-400 font-bold mt-1 uppercase">{new Date(job.endTime!).toLocaleDateString()}</p>
+                                </div>
+                                <div className="text-right">
+                                   <p className="text-xl font-black text-gray-900">{job.distanceKm} <span className="text-[10px] text-gray-400">KM</span></p>
+                                   <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-0.5">Successful</p>
+                                </div>
+                             </div>
+                          ))}
+                          {driverJobs.filter(j => j.status === JobStatus.COMPLETED).length === 0 && (
+                             <div className="bg-gray-50 rounded-[2rem] p-10 text-center text-gray-400 font-bold text-xs uppercase italic border border-dashed border-gray-200">No completed missions</div>
+                          )}
+                       </div>
+                    </div>
+                 </div>
+              </div>
+              
+              <div className="p-8 bg-gray-900 text-white flex justify-between items-center">
+                 <div className="flex space-x-8">
+                    <div>
+                       <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-1">Performance Index</p>
+                       <div className="flex items-center space-x-1">
+                          {[1,2,3,4,5].map(i => <i key={i} className="fas fa-star text-orange-400 text-[10px]"></i>)}
+                       </div>
+                    </div>
+                    <div className="w-px h-10 bg-white/10"></div>
+                    <div>
+                       <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-1">Security PIN</p>
+                       <p className="text-sm font-black tracking-[0.3em]">{selectedDriver.password}</p>
+                    </div>
+                 </div>
+                 <button onClick={() => onDeleteDriver(selectedDriver.id)} className="bg-rose-600 hover:bg-rose-700 text-white px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition shadow-xl shadow-rose-950/20">Decommission Unit</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Dispatch Console Modal */}
       {showJobModal && (
         <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[200] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xl rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
@@ -259,7 +396,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
               <div className="space-y-2">
                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2">Shipment Narratives</label>
-                 <textarea value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} placeholder="Load details, safety instructions, special requirements..." className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold outline-none h-24 resize-none" />
+                 <textarea value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} placeholder="Load details, safety instructions..." className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold outline-none h-24 resize-none" />
               </div>
               <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center group hover:bg-blue-50/50 hover:border-blue-200 transition-all relative">
                 <input type="file" onChange={handleFileChange} className="hidden" id="job-attach" />
@@ -274,7 +411,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* Driver Modal */}
+      {/* Driver Registration Modal */}
       {showDriverModal && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[200] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl">
