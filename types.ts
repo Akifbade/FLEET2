@@ -17,6 +17,7 @@ export enum TripType {
 export interface Location {
   lat: number;
   lng: number;
+  speed?: number;
   timestamp?: number;
 }
 
@@ -44,18 +45,21 @@ export interface Job {
   id: string;
   driverId: string;
   origin: string;
+  originAddress?: string;
   destination: string;
+  destinationAddress?: string;
   status: JobStatus;
   tripType: TripType;
   startTime?: string;
   endTime?: string;
   startLocation?: Location;
   endLocation?: Location;
+  route?: Location[]; // Breadcrumbs for replay
   distanceKm?: number;
   avgSpeed?: number;
   assignedAt: string;
   description: string;
-  attachmentUrl?: string; // Digital Manifest / Waybill
+  attachmentUrl?: string;
 }
 
 export interface Driver {
