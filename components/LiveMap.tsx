@@ -35,54 +35,53 @@ const LiveMap: React.FC<LiveMapProps> = ({ drivers, jobs, selectedJobId, route =
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    // Default center to a more central location or first driver
-    const initialCenter: [number, number] = [28.6139, 77.2090]; // Delhi
+    // Center on India (where mock data is located)
+    const initialCenter: [number, number] = [28.6139, 77.2090]; 
 
     mapRef.current = L.map(mapContainerRef.current, {
       center: initialCenter,
       zoom: 13,
       zoomControl: false,
       attributionControl: false,
-      maxZoom: 19,
+      maxZoom: 20,
       minZoom: 3,
-      worldCopyJump: false, // Prevents duplicate world views
+      worldCopyJump: false, // Prevents the map from showing multiple worlds
     });
 
-    // Detailed "Google Maps" style provider (OSM Bright / Streets)
-    // Using Humanitarian OSM Style for high visibility of landmarks and roads
-    L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{y}/{x}.png', {
-      maxZoom: 19,
-      noWrap: true, // Crucial: stops the world from repeating horizontally
-      attribution: '&copy; OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team'
+    // High-Detail Google Maps Street Tiles (Free for Use via public CDN)
+    // lyrs=m is the standard roadmap view
+    L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      noWrap: true, // IMPORTANT: Fixes the 'puzzle' repeating world issue
     }).addTo(mapRef.current);
 
-    // Initial positioning: Zoom to drivers immediately if they exist
+    // Initial Zoom: Immediately focus on active drivers to avoid "Global View"
     const driversWithLoc = drivers.filter(d => d.lastKnownLocation);
     if (driversWithLoc.length > 0) {
       const markers = driversWithLoc.map(d => L.marker([d.lastKnownLocation!.lat, d.lastKnownLocation!.lng]));
       const group = L.featureGroup(markers);
-      mapRef.current.fitBounds(group.getBounds().pad(0.3), { maxZoom: 15 });
+      mapRef.current.fitBounds(group.getBounds().pad(0.3), { maxZoom: 14 });
     }
 
-    // Force tile refresh and size recalculation to prevent blank/grey areas
-    setTimeout(() => {
+    // Fix for the map rendering correctly on mobile and different screen sizes
+    const handleResize = () => {
       if (mapRef.current) {
         mapRef.current.invalidateSize();
       }
-    }, 400);
+    };
 
-    // Watch for container resize
-    const resizeObserver = new ResizeObserver(() => {
-      mapRef.current?.invalidateSize();
-    });
-    resizeObserver.observe(mapContainerRef.current);
+    window.addEventListener('resize', handleResize);
+    
+    // Force a size check after a small delay to handle parent animation/rendering
+    setTimeout(handleResize, 500);
 
     return () => {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
-      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
@@ -223,33 +222,33 @@ const LiveMap: React.FC<LiveMapProps> = ({ drivers, jobs, selectedJobId, route =
   const activeMissions = jobs.filter(j => j.status === JobStatus.IN_PROGRESS);
 
   return (
-    <div className="w-full h-full relative overflow-hidden bg-[#e5e7eb]">
+    <div className="w-full h-full relative overflow-hidden bg-white">
       {/* Map Element */}
       <div ref={mapContainerRef} className="w-full h-full z-0" style={{ minHeight: '100%' }} />
 
-      {/* Primary Toolbar */}
+      {/* Primary Map Toolbar */}
       <div className="absolute top-8 left-8 z-[1000] flex flex-col space-y-4">
-        <button onClick={() => setShowSidebar(!showSidebar)} className="w-16 h-16 bg-slate-900 text-white rounded-[1.75rem] flex items-center justify-center shadow-2xl border border-white/10 hover:bg-blue-600 transition active:scale-95">
+        <button onClick={() => setShowSidebar(!showSidebar)} className="w-14 h-14 bg-slate-900 text-white rounded-[1.5rem] flex items-center justify-center shadow-2xl border border-white/10 hover:bg-blue-600 transition active:scale-95">
           <i className={`fas ${showSidebar ? 'fa-indent' : 'fa-list-ul'} text-xl`}></i>
         </button>
-        <button onClick={locateUser} className="w-16 h-16 bg-white text-slate-900 rounded-[1.75rem] flex items-center justify-center shadow-2xl border border-gray-100 hover:bg-gray-50 transition active:scale-95">
-          <i className="fas fa-location-crosshairs text-2xl"></i>
+        <button onClick={locateUser} className="w-14 h-14 bg-white text-slate-900 rounded-[1.5rem] flex items-center justify-center shadow-2xl border border-gray-100 hover:bg-gray-50 transition active:scale-95">
+          <i className="fas fa-location-crosshairs text-xl"></i>
         </button>
-        <button onClick={() => { setIsLocked(false); setLockedTargetId(null); }} className={`w-16 h-16 rounded-[1.75rem] flex items-center justify-center shadow-2xl border transition active:scale-95 ${isLocked ? 'bg-blue-600 text-white border-blue-400' : 'bg-white text-gray-400 border-gray-200'}`}>
+        <button onClick={() => { setIsLocked(false); setLockedTargetId(null); }} className={`w-14 h-14 rounded-[1.5rem] flex items-center justify-center shadow-2xl border transition active:scale-95 ${isLocked ? 'bg-blue-600 text-white border-blue-400' : 'bg-white text-gray-400 border-gray-200'}`}>
           <i className={`fas ${isLocked ? 'fa-lock' : 'fa-lock-open'} text-xl`}></i>
         </button>
       </div>
 
-      {/* Side Management Panel */}
+      {/* Side Overlay Panel */}
       {showSidebar && !selectedJobId && (
-        <div className="absolute top-8 bottom-8 right-8 z-[1001] w-full md:w-[380px] flex flex-col animate-in slide-in-from-right-10 pointer-events-none">
-          <div className="bg-white/95 backdrop-blur-3xl rounded-[3.5rem] border border-gray-100 shadow-[0_50px_100px_-30px_rgba(0,0,0,0.3)] flex flex-col h-full overflow-hidden pointer-events-auto">
-            <div className="p-6 flex bg-gray-50/50 border-b border-gray-100">
-              <button onClick={() => setActiveTab('DRIVERS')} className={`flex-1 py-5 rounded-[2rem] font-black text-[12px] uppercase tracking-[0.2em] transition-all ${activeTab === 'DRIVERS' ? 'bg-slate-900 text-white shadow-xl' : 'text-gray-400 hover:text-gray-900'}`}>Fleet</button>
-              <button onClick={() => setActiveTab('MISSIONS')} className={`flex-1 py-5 rounded-[2rem] font-black text-[12px] uppercase tracking-[0.2em] transition-all ${activeTab === 'MISSIONS' ? 'bg-slate-900 text-white shadow-xl' : 'text-gray-400 hover:text-gray-900'}`}>Active</button>
+        <div className="absolute top-8 bottom-8 right-8 z-[1001] w-full md:w-[360px] flex flex-col animate-in slide-in-from-right-10 pointer-events-none">
+          <div className="bg-white/95 backdrop-blur-3xl rounded-[3.5rem] border border-gray-100 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)] flex flex-col h-full overflow-hidden pointer-events-auto">
+            <div className="p-5 flex bg-gray-50/50 border-b border-gray-100">
+              <button onClick={() => setActiveTab('DRIVERS')} className={`flex-1 py-4 rounded-[1.75rem] font-black text-[11px] uppercase tracking-[0.2em] transition-all ${activeTab === 'DRIVERS' ? 'bg-slate-900 text-white shadow-xl' : 'text-gray-400 hover:text-gray-900'}`}>Fleet</button>
+              <button onClick={() => setActiveTab('MISSIONS')} className={`flex-1 py-4 rounded-[1.75rem] font-black text-[11px] uppercase tracking-[0.2em] transition-all ${activeTab === 'MISSIONS' ? 'bg-slate-900 text-white shadow-xl' : 'text-gray-400 hover:text-gray-900'}`}>Active</button>
             </div>
 
-            <div className="flex-grow overflow-y-auto scrollbar-hide p-8 space-y-6">
+            <div className="flex-grow overflow-y-auto scrollbar-hide p-6 space-y-4">
               {activeTab === 'DRIVERS' ? (
                 drivers.map(d => {
                   const effectiveStatus = getEffectiveStatus(d);
@@ -257,37 +256,37 @@ const LiveMap: React.FC<LiveMapProps> = ({ drivers, jobs, selectedJobId, route =
                     <button 
                       key={d.id} 
                       onClick={() => focusOnDriver(d)} 
-                      className={`w-full text-left p-8 rounded-[3rem] border-2 transition-all ${lockedTargetId === d.id ? 'bg-white border-blue-500 shadow-2xl scale-[1.03]' : 'bg-white border-gray-100 shadow-sm hover:border-blue-200'}`}
+                      className={`w-full text-left p-6 rounded-[2.5rem] border-2 transition-all ${lockedTargetId === d.id ? 'bg-white border-blue-500 shadow-xl scale-[1.02]' : 'bg-white border-gray-50 shadow-sm hover:border-blue-200'}`}
                     >
-                      <div className="flex justify-between items-start mb-4">
-                        <span className="font-black text-slate-900 text-lg uppercase tracking-tight">{d.name}</span>
-                        <div className={`w-4 h-4 rounded-full border-2 border-white shadow-sm ${effectiveStatus === 'ON_JOB' ? 'bg-emerald-500 animate-pulse' : effectiveStatus === 'ONLINE' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="font-black text-slate-900 text-base uppercase tracking-tight">{d.name}</span>
+                        <div className={`w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm ${effectiveStatus === 'ON_JOB' ? 'bg-emerald-500 animate-pulse' : effectiveStatus === 'ONLINE' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
                       </div>
                       <div className="flex justify-between items-end">
-                        <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{d.vehicleNo}</span>
-                        <span className="text-[16px] font-black text-slate-900">{Math.round(d.lastKnownLocation?.speed || 0)} KM/H</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{d.vehicleNo}</span>
+                        <span className="text-[14px] font-black text-slate-900">{Math.round(d.lastKnownLocation?.speed || 0)} KM/H</span>
                       </div>
                     </button>
                   );
                 })
               ) : (
                 activeMissions.length === 0 ? (
-                  <div className="text-center py-24 text-gray-400">
-                    <i className="fas fa-truck-fast text-6xl mb-6 opacity-10"></i>
-                    <p className="text-[11px] font-black uppercase tracking-widest opacity-30">Zero active runs</p>
+                  <div className="text-center py-20 text-gray-400">
+                    <i className="fas fa-truck-fast text-5xl mb-6 opacity-10"></i>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Ready for Orders</p>
                   </div>
                 ) : (
                   activeMissions.map(m => (
                     <button key={m.id} onClick={() => {
                       const d = drivers.find(d => d.id === m.driverId);
                       if (d) focusOnDriver(d);
-                    }} className="w-full text-left p-8 rounded-[3.5rem] bg-emerald-50/50 border-2 border-emerald-100 shadow-sm hover:border-emerald-300 transition-all">
-                      <div className="flex justify-between mb-5">
-                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.4em]">{m.tripType}</span>
-                        <span className="text-[10px] font-black text-emerald-900/30">#{m.id}</span>
+                    }} className="w-full text-left p-6 rounded-[2.5rem] bg-emerald-50/50 border-2 border-emerald-100 shadow-sm hover:border-emerald-300 transition-all">
+                      <div className="flex justify-between mb-4">
+                        <span className="text-[8px] font-black text-emerald-600 uppercase tracking-[0.4em]">{m.tripType}</span>
+                        <span className="text-[10px] font-black text-emerald-900/20">#{m.id}</span>
                       </div>
-                      <p className="text-slate-900 font-black text-2xl leading-tight mb-4">{m.origin} → {m.destination}</p>
-                      <p className="text-[12px] font-black text-emerald-700/80 uppercase">Assignee: {drivers.find(d => d.id === m.driverId)?.name}</p>
+                      <p className="text-slate-900 font-black text-lg leading-tight mb-3">{m.origin} → {m.destination}</p>
+                      <p className="text-[10px] font-black text-emerald-700/80 uppercase">Assignee: {drivers.find(d => d.id === m.driverId)?.name}</p>
                     </button>
                   ))
                 )
@@ -297,45 +296,45 @@ const LiveMap: React.FC<LiveMapProps> = ({ drivers, jobs, selectedJobId, route =
         </div>
       )}
 
-      {/* Dossier Replay Interface */}
+      {/* Analysis Interface for Trip Replay */}
       {selectedJobId && route.length > 0 && (
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-[1100] w-full max-w-2xl px-8 animate-in slide-in-from-bottom-24">
-          <div className="bg-slate-900/95 backdrop-blur-3xl rounded-[5rem] p-12 border border-white/10 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)]">
-            <div className="flex justify-between items-center mb-10">
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[1100] w-full max-w-xl px-6 animate-in slide-in-from-bottom-24">
+          <div className="bg-slate-900/95 backdrop-blur-3xl rounded-[4rem] p-10 border border-white/10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.8)]">
+            <div className="flex justify-between items-center mb-8">
               <div>
-                <h4 className="text-white text-3xl font-black tracking-tighter uppercase leading-none">Trip Analysis</h4>
-                <p className="text-blue-400 text-[11px] font-black uppercase tracking-[0.4em] mt-2">Dossier Data Synchronized</p>
+                <h4 className="text-white text-2xl font-black tracking-tighter uppercase leading-none">Trip Analysis</h4>
+                <p className="text-blue-400 text-[10px] font-black uppercase tracking-[0.4em] mt-2">Corridor Tracking Active</p>
               </div>
               <div className="flex space-x-2">
                 {[1, 2, 4].map(s => (
-                  <button key={s} onClick={() => setPlaybackSpeed(s)} className={`px-6 py-3 rounded-2xl text-[11px] font-black transition ${playbackSpeed === s ? 'bg-blue-600 text-white shadow-2xl' : 'bg-white/5 text-gray-500 hover:text-white'}`}>{s}X</button>
+                  <button key={s} onClick={() => setPlaybackSpeed(s)} className={`px-4 py-2 rounded-xl text-[10px] font-black transition ${playbackSpeed === s ? 'bg-blue-600 text-white shadow-xl' : 'bg-white/5 text-gray-500 hover:text-white'}`}>{s}X</button>
                 ))}
               </div>
             </div>
 
-            <div className="relative h-3 bg-white/10 rounded-full mb-10 cursor-pointer" onClick={(e) => {
+            <div className="relative h-2 bg-white/10 rounded-full mb-8 cursor-pointer" onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               setReplayIndex(Math.floor(((e.clientX - rect.left) / rect.width) * (route.length - 1)));
             }}>
-              <div className="absolute top-0 left-0 h-full bg-blue-500 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.6)] transition-all duration-300" style={{ width: `${(replayIndex / (route.length - 1)) * 100}%` }}></div>
+              <div className="absolute top-0 left-0 h-full bg-blue-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.6)] transition-all duration-300" style={{ width: `${(replayIndex / (route.length - 1)) * 100}%` }}></div>
             </div>
 
-            <div className="flex justify-center items-center space-x-12">
-              <button onClick={() => setReplayIndex(Math.max(0, replayIndex - 10))} className="w-18 h-18 rounded-[2rem] bg-white/5 text-gray-400 hover:text-white border border-white/5 transition-all text-xl active:scale-90 flex items-center justify-center"><i className="fas fa-backward-step"></i></button>
-              <button onClick={() => setIsReplaying(!isReplaying)} className="w-24 h-24 rounded-[2.5rem] bg-white text-slate-950 text-4xl flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all">
+            <div className="flex justify-center items-center space-x-10">
+              <button onClick={() => setReplayIndex(Math.max(0, replayIndex - 10))} className="w-14 h-14 rounded-2xl bg-white/5 text-gray-400 hover:text-white border border-white/5 transition-all text-lg active:scale-90 flex items-center justify-center"><i className="fas fa-backward-step"></i></button>
+              <button onClick={() => setIsReplaying(!isReplaying)} className="w-20 h-20 rounded-[2rem] bg-white text-slate-950 text-3xl flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all">
                 <i className={`fas ${isReplaying ? 'fa-pause' : 'fa-play'}`}></i>
               </button>
-              <button onClick={() => setReplayIndex(Math.min(route.length - 1, replayIndex + 10))} className="w-18 h-18 rounded-[2rem] bg-white/5 text-gray-400 hover:text-white border border-white/5 transition-all text-xl active:scale-90 flex items-center justify-center"><i className="fas fa-forward-step"></i></button>
+              <button onClick={() => setReplayIndex(Math.min(route.length - 1, replayIndex + 10))} className="w-14 h-14 rounded-2xl bg-white/5 text-gray-400 hover:text-white border border-white/5 transition-all text-lg active:scale-90 flex items-center justify-center"><i className="fas fa-forward-step"></i></button>
             </div>
 
-            <div className="mt-12 flex justify-between text-[11px] font-black text-gray-500 uppercase tracking-widest border-t border-white/5 pt-10">
-              <div className="flex items-center space-x-4">
-                 <i className="fas fa-clock text-blue-500 text-lg"></i>
-                 <span className="text-white text-sm">{new Date(route[replayIndex].timestamp || 0).toLocaleTimeString()}</span>
+            <div className="mt-8 flex justify-between text-[10px] font-black text-gray-500 uppercase tracking-widest border-t border-white/5 pt-8">
+              <div className="flex items-center space-x-3">
+                 <i className="fas fa-clock text-blue-500 text-base"></i>
+                 <span className="text-white text-xs">{new Date(route[replayIndex].timestamp || 0).toLocaleTimeString()}</span>
               </div>
-              <div className="flex items-center space-x-4">
-                 <span className="text-white text-xl">{Math.round(route[replayIndex].speed || 0)} KM/H</span>
-                 <i className="fas fa-gauge-high text-blue-500 text-lg"></i>
+              <div className="flex items-center space-x-3">
+                 <span className="text-white text-base">{Math.round(route[replayIndex].speed || 0)} KM/H</span>
+                 <i className="fas fa-gauge-high text-blue-500 text-base"></i>
               </div>
             </div>
           </div>
