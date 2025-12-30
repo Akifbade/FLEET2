@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Driver, Job, ReceiptEntry, JobStatus, ReceiptType, FleetSettings, Location } from '../types';
 import { db, fileToBase64 } from '../services/firebase';
-import { doc, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
 
 interface DriverPortalProps {
   driver: Driver;
@@ -24,6 +24,36 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
   const pendingJobs = jobs.filter(j => j.status === JobStatus.PENDING);
   const completedJobs = jobs.filter(j => j.status === JobStatus.COMPLETED).sort((a, b) => new Date(b.endTime!).getTime() - new Date(a.endTime!).getTime());
 
+  // Heartbeat Logic for Real-time Status
+  useEffect(() => {
+    if (!db) return;
+
+    const updatePresence = async (status: 'ONLINE' | 'ON_JOB' | 'OFFLINE') => {
+      try {
+        await updateDoc(doc(db, "drivers", driver.id), {
+          status: status,
+          lastSeen: Date.now()
+        });
+      } catch (e) {
+        console.error("Presence update failed", e);
+      }
+    };
+
+    // Set Online on Mount
+    updatePresence(activeJob ? 'ON_JOB' : 'ONLINE');
+
+    // Interval Heartbeat (every 30 seconds)
+    const heartbeat = setInterval(() => {
+      updatePresence(activeJob ? 'ON_JOB' : 'ONLINE');
+    }, 30000);
+
+    // Set Offline on Unmount
+    return () => {
+      clearInterval(heartbeat);
+      updatePresence('OFFLINE');
+    };
+  }, [driver.id, activeJob]);
+
   // Driver stats
   const dailyKm = completedJobs
     .filter(j => new Date(j.endTime!).toDateString() === new Date().toDateString())
@@ -31,10 +61,10 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
 
   const getSyncCooldown = () => {
     switch(fleetSettings.syncSpeed) {
-      case 'FAST': return 5000;
-      case 'MEDIUM': return 15000;
-      case 'SLOW': return 60000;
-      default: return 15000;
+      case 'FAST': return 3000; // Increased frequency for better high-speed accuracy
+      case 'MEDIUM': return 10000;
+      case 'SLOW': return 30000;
+      default: return 10000;
     }
   };
 
@@ -48,7 +78,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
       };
 
       await updateDoc(doc(db, "drivers", driver.id), {
-        lastKnownLocation: loc
+        lastKnownLocation: loc,
+        lastSeen: Date.now() 
       });
 
       if (activeJob) {
@@ -66,12 +97,18 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
       geoWatchId.current = navigator.geolocation.watchPosition(
         (pos) => {
           const now = Date.now();
-          if (now - lastSyncTimestamp.current > getSyncCooldown()) {
+          // Force update if speed is high or cooldown reached
+          const isHighSpeed = (pos.coords.speed || 0) > 15; // > 54 km/h
+          if (now - lastSyncTimestamp.current > (isHighSpeed ? 2000 : getSyncCooldown())) {
             updateLocationInDB(pos);
           }
         },
         null,
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+        { 
+          enableHighAccuracy: true, 
+          maximumAge: 0, // No cache for live tracking
+          timeout: 10000 
+        }
       );
     } else {
       if (geoWatchId.current) {
@@ -121,7 +158,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
               <p className="text-gray-400 text-[9px] font-black uppercase tracking-[0.2em]">{driver.vehicleNo} • ID: {driver.id}</p>
             </div>
           </div>
-          <div className={`w-3 h-3 rounded-full ${activeJob ? 'bg-emerald-500 animate-pulse' : 'bg-gray-700'}`}></div>
+          <div className={`w-3 h-3 rounded-full ${activeJob ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-500'}`}></div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mt-8">

@@ -83,7 +83,17 @@ const App: React.FC = () => {
               Math.cos(loc1.lat * Math.PI / 180) * Math.cos(loc2.lat * Math.PI / 180) *
               Math.sin(dLng/2) * Math.sin(dLng/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return parseFloat((R * c).toFixed(2));
+    return R * c;
+  };
+
+  // NEW: Cumulative distance based on breadcrumbs
+  const calculateRouteDistance = (route: Location[]): number => {
+    if (!route || route.length < 2) return 0;
+    let total = 0;
+    for (let i = 0; i < route.length - 1; i++) {
+      total += calculateDistance(route[i], route[i + 1]);
+    }
+    return parseFloat(total.toFixed(2));
   };
 
   const handleUpdateJobStatus = async (jobId: string, status: JobStatus) => {
@@ -111,18 +121,20 @@ const App: React.FC = () => {
         updates.endTime = now;
         if (endPos) updates.endLocation = endPos;
 
-        if (targetJob.startLocation && endPos) {
-          const realKm = calculateDistance(targetJob.startLocation, endPos);
-          updates.distanceKm = realKm;
-          
-          if (targetJob.startTime) {
-            const startT = new Date(targetJob.startTime).getTime();
-            const endT = new Date(now).getTime();
-            const durationHours = (endT - startT) / (1000 * 60 * 60);
-            updates.avgSpeed = durationHours > 0 ? Math.round(realKm / durationHours) : 0;
-          }
+        // Use the cumulative route data if available, fallback to straight line
+        const finalRoute = [...(targetJob.route || [])];
+        if (endPos) finalRoute.push(endPos);
+        
+        const realKm = calculateRouteDistance(finalRoute);
+        updates.distanceKm = realKm;
+        
+        if (targetJob.startTime) {
+          const startT = new Date(targetJob.startTime).getTime();
+          const endT = new Date(now).getTime();
+          const durationHours = (endT - startT) / (1000 * 60 * 60);
+          updates.avgSpeed = durationHours > 0 ? Math.round(realKm / durationHours) : 0;
         }
-        addNotification(`Delivery Finished: Arrived at ${targetJob.destination}`, 'success');
+        addNotification(`Delivery Finished: Arrived at ${targetJob.destination} (${realKm} KM)`, 'success');
       }
 
       await updateDoc(jobRef, updates);

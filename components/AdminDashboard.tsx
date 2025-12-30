@@ -22,6 +22,15 @@ interface AdminDashboardProps {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Utility to determine real-time presence based on heartbeat
+export const getEffectiveStatus = (driver: Driver): 'ONLINE' | 'OFFLINE' | 'ON_JOB' => {
+  const HEARTBEAT_TIMEOUT = 60000; // 60 seconds
+  if (!driver.lastSeen || (Date.now() - driver.lastSeen > HEARTBEAT_TIMEOUT)) {
+    return 'OFFLINE';
+  }
+  return driver.status;
+};
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
   drivers, jobs, fuelEntries, fleetSettings, onUpdateSyncSpeed,
   onAddJob, onAddDriver, onUpdateDriver, onDeleteDriver 
@@ -273,11 +282,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {activeTab === 'DRIVERS' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {drivers.map(driver => {
+            const effectiveStatus = getEffectiveStatus(driver);
             const dJobs = jobs.filter(j => j.driverId === driver.id && j.status === JobStatus.COMPLETED);
             const dKm = dJobs.reduce((acc, j) => acc + (j.distanceKm || 0), 0);
             return (
               <div key={driver.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden group hover:shadow-xl transition-all cursor-pointer" onClick={() => setSelectedDriverId(driver.id)}>
-                <div className={`absolute top-0 right-0 w-3 h-full ${driver.status === 'ONLINE' ? 'bg-emerald-500' : driver.status === 'ON_JOB' ? 'bg-orange-500' : 'bg-gray-200'}`}></div>
+                <div className={`absolute top-0 right-0 w-3 h-full ${effectiveStatus === 'ONLINE' ? 'bg-emerald-500' : effectiveStatus === 'ON_JOB' ? 'bg-orange-500' : 'bg-gray-200'}`}></div>
                 <h3 className="font-black text-gray-900 uppercase tracking-tight text-xl">{driver.name}</h3>
                 <p className="text-blue-600 text-[10px] font-black uppercase tracking-widest mb-6">{driver.vehicleNo}</p>
                 <div className="grid grid-cols-2 gap-3 mb-6">
@@ -325,7 +335,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     {[
                        { label: 'Cumulative Dist', value: `${driverTotalKm.toFixed(2)} KM`, color: 'bg-blue-50 text-blue-600', sub: 'Real GPS Data' },
-                       { label: 'Active Status', value: selectedDriver.status, color: 'bg-emerald-50 text-emerald-600', sub: 'Terminal Live' },
+                       { label: 'Active Status', value: getEffectiveStatus(selectedDriver), color: 'bg-emerald-50 text-emerald-600', sub: 'Terminal Live' },
                        { label: 'Fuel Refills', value: fuelEntries.filter(f => f.driverId === selectedDriver.id && f.type === 'FUEL').length, color: 'bg-orange-50 text-orange-600', sub: 'Verified Proofs' },
                        { label: 'Avg Velocity', value: `${Math.round(driverJobs.reduce((acc, j) => acc + (j.avgSpeed || 0), 0) / (driverJobs.length || 1))} KM/H`, color: 'bg-indigo-50 text-indigo-600', sub: 'Mission Metric' },
                     ].map((s, i) => (

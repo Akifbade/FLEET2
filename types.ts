@@ -70,6 +70,7 @@ export interface Driver {
   status: 'ONLINE' | 'OFFLINE' | 'ON_JOB';
   phone: string;
   lastKnownLocation?: Location;
+  lastSeen?: number; // Real-time heartbeat timestamp
 }
 
 export type ViewMode = 'ADMIN' | 'DRIVER';
