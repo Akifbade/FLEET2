@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Driver, Job, ReceiptEntry, JobStatus } from '../types';
 import LiveMap from './LiveMap';
@@ -184,7 +183,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
            <div className="bg-orange-50 p-8 rounded-[2rem] border border-orange-100">
               <h4 className="font-black text-orange-900 uppercase text-xs mb-3">Zaroori Information</h4>
               <p className="text-sm text-orange-800 font-medium">
-                Vercel par deploy hone ke baad <b>Settings -> Environment Variables</b> mein jakar <code>API_KEY</code> zaroor daal dena, warna AI (Gemini) kaam nahi karega.
+                Vercel par deploy hone ke baad <b>Settings -&gt; Environment Variables</b> mein jakar <code>API_KEY</code> zaroor daal dena, warna AI (Gemini) kaam nahi karega.
               </p>
            </div>
         </div>
