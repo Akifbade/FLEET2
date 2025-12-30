@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import L from 'leaflet';
 import { Job, Driver, JobStatus } from '../types';
 import { db } from '../services/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { Package, MapPin, Truck, Clock, Navigation } from 'lucide-react';
 
 // Custom icons for the map
@@ -43,13 +43,13 @@ const CustomerTracking: React.FC<CustomerTrackingProps> = ({ jobId }) => {
       return;
     }
 
-    const unsubJob = onSnapshot(doc(db, "jobs", jobId), (snap) => {
+    const unsubJob = onSnapshot(doc(db, "jobs", jobId), (snap: DocumentSnapshot) => {
       if (snap.exists()) {
         const jobData = { ...snap.data(), id: snap.id } as Job;
         setJob(jobData);
         
         // Once we have the job, listen to the driver's location
-        const unsubDriver = onSnapshot(doc(db, "drivers", jobData.driverId), (dSnap) => {
+        const unsubDriver = onSnapshot(doc(db, "drivers", jobData.driverId), (dSnap: DocumentSnapshot) => {
           if (dSnap.exists()) {
             setDriver({ ...dSnap.data(), id: dSnap.id } as Driver);
           }
