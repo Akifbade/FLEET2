@@ -1,0 +1,8 @@
+{
+  "name": "QGO Cargo Fleet Tracker",
+  "description": "Professional driver and vehicle tracking system with real-time job management, fuel monitoring, and AI-driven performance analytics.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
