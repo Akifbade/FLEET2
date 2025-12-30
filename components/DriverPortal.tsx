@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Driver, Job, ReceiptEntry, JobStatus, ReceiptType } from '../types';
 import { db, fileToBase64 } from '../services/firebase';
@@ -18,17 +17,20 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
   const [isSyncing, setIsSyncing] = useState(false);
   const geoWatchId = useRef<number | null>(null);
   const wakeLock = useRef<any>(null);
+  const lastSyncTimestamp = useRef<number>(0);
+
+  // CONFIG: How often to write to Firebase (in milliseconds)
+  // 30000ms = 30 seconds. Saves 6x more writes than 5s sync.
+  const SYNC_COOLDOWN = 30000; 
 
   const activeJob = jobs.find(j => j.status === JobStatus.IN_PROGRESS);
 
-  // MANAGE SCREEN WAKE LOCK (Keeps screen ON during trips)
   const requestWakeLock = async () => {
     if ('wakeLock' in navigator) {
       try {
         wakeLock.current = await (navigator as any).wakeLock.request('screen');
-        console.log('Screen Wake Lock is active');
       } catch (err) {
-        console.error(`${err.name}, ${err.message}`);
+        console.error("WakeLock Error:", err);
       }
     }
   };
@@ -50,7 +52,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
     return () => releaseWakeLock();
   }, [activeJob]);
 
-  // MANUAL SYNC FUNCTION
   const handleManualSync = () => {
     if (!("geolocation" in navigator)) return;
     
@@ -63,7 +64,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
           await updateDoc(driverRef, {
             lastKnownLocation: { lat: latitude, lng: longitude, timestamp: Date.now() }
           });
-          // Show success briefly
+          lastSyncTimestamp.current = Date.now();
           setTimeout(() => setIsSyncing(false), 1000);
         } catch (e) {
           console.error("Manual sync failed:", e);
@@ -71,34 +72,38 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
         }
       },
       (error) => {
-        console.error("GPS Error during manual sync:", error);
         setIsSyncing(false);
-        alert("GPS Signal Weak. Please try again in an open area.");
+        alert("GPS Signal Weak.");
       },
       { enableHighAccuracy: true }
     );
   };
 
-  // REAL GPS STREAMING
   useEffect(() => {
     if ("geolocation" in navigator) {
       geoWatchId.current = navigator.geolocation.watchPosition(
         async (position) => {
-          const { latitude, longitude } = position.coords;
-          const driverRef = doc(db, "drivers", driver.id);
-          try {
-            await updateDoc(driverRef, {
-              lastKnownLocation: { lat: latitude, lng: longitude, timestamp: Date.now() }
-            });
-          } catch (e) {
-            console.error("Cloud location sync failed:", e);
+          const now = Date.now();
+          // SMART SYNC: Only write to Firebase if cooldown has passed
+          if (now - lastSyncTimestamp.current > SYNC_COOLDOWN) {
+            const { latitude, longitude } = position.coords;
+            const driverRef = doc(db, "drivers", driver.id);
+            try {
+              await updateDoc(driverRef, {
+                lastKnownLocation: { lat: latitude, lng: longitude, timestamp: now }
+              });
+              lastSyncTimestamp.current = now;
+              console.log("Firebase Smart Sync: Location updated");
+            } catch (e) {
+              console.error("Cloud location sync failed:", e);
+            }
           }
         },
         (error) => console.error("GPS Error:", error),
         { 
           enableHighAccuracy: true, 
-          maximumAge: 5000, // Sync every 5 seconds
-          timeout: 15000 
+          maximumAge: 10000, 
+          timeout: 20000 
         }
       );
     }
@@ -140,7 +145,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
 
   return (
     <div className="max-w-md mx-auto space-y-6 pb-24 px-2">
-      {/* Real-time Header */}
       <div className="bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
         <div className="relative z-10 space-y-6">
           <div className="flex items-center justify-between">
@@ -166,15 +170,19 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
             >
               <i className={`fas ${isSyncing ? 'fa-circle-notch fa-spin' : 'fa-location-crosshairs'} text-lg`}></i>
               <span className="font-black text-[11px] uppercase tracking-wider">
-                {isSyncing ? 'Syncing Coordinates...' : 'Sync Current Location'}
+                {isSyncing ? 'Syncing...' : 'Force GPS Sync'}
               </span>
             </button>
-            <p className="text-[9px] text-white/40 font-bold uppercase text-center mt-3 tracking-widest">
-              Last Sync: {driver.lastKnownLocation ? new Date(driver.lastKnownLocation.timestamp || 0).toLocaleTimeString() : 'No Signal'}
-            </p>
+            <div className="flex justify-between items-center mt-4">
+              <span className="bg-emerald-500/20 text-emerald-400 text-[8px] font-black px-2 py-0.5 rounded-full border border-emerald-500/30 uppercase tracking-widest">
+                <i className="fas fa-leaf mr-1"></i> Eco-Sync Mode Active (30s)
+              </span>
+              <p className="text-[9px] text-white/40 font-bold uppercase tracking-widest">
+                Last: {driver.lastKnownLocation ? new Date(driver.lastKnownLocation.timestamp || 0).toLocaleTimeString() : 'None'}
+              </p>
+            </div>
           </div>
         </div>
-        {/* Background signal icon */}
         <i className="fas fa-satellite absolute -right-6 -bottom-6 text-white/5 text-[10rem] rotate-12"></i>
       </div>
 
@@ -186,13 +194,12 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
           <div className="space-y-1">
             <p className="text-[11px] font-black text-blue-900 uppercase tracking-wide">Stealth Tracking Active</p>
             <p className="text-[10px] font-medium text-blue-800 leading-relaxed">
-              Your screen will stay on during the trip. This ensures Admin gets your 100% accurate location data.
+              Screen will stay ON for precision tracking. Admin is monitoring this trip.
             </p>
           </div>
         </div>
       )}
 
-      {/* Driver Actions */}
       <div className="grid grid-cols-2 gap-4">
         <button onClick={() => { setLogType('FUEL'); setShowLogForm(true); }} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col items-center space-y-4 active:scale-95 transition group">
           <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-2xl group-hover:scale-110 transition shadow-sm">
@@ -208,7 +215,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
         </button>
       </div>
 
-      {/* Active Trip Info */}
       {activeJob ? (
         <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 p-8 space-y-8 animate-in slide-in-from-bottom-4">
           <div className="flex justify-between items-center">
@@ -251,7 +257,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
         </div>
       )}
 
-      {/* Log Receipt Modal */}
       {showLogForm && (
         <div className="fixed inset-0 bg-gray-900/90 backdrop-blur-md z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
@@ -273,7 +278,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
                 </div>
                 <div className="bg-gray-50 rounded-3xl p-5 border border-gray-100 focus-within:border-blue-500 transition-colors">
                   <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Narration</label>
-                  <input name="description" placeholder="Petrol Pump Name, Bill No..." className="w-full bg-transparent font-bold text-sm outline-none placeholder:text-gray-300" />
+                  <input name="description" placeholder="Pump Name, Bill No..." className="w-full bg-transparent font-bold text-sm outline-none placeholder:text-gray-300" />
                 </div>
               </div>
               
@@ -287,7 +292,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, onUpdateJobSt
               </div>
 
               <button type="submit" disabled={isUploading} className={`w-full ${isUploading ? 'bg-gray-400' : 'bg-gray-900'} text-white py-6 rounded-[1.5rem] font-black uppercase tracking-widest transition-all shadow-2xl shadow-gray-200 flex items-center justify-center space-x-3`}>
-                {isUploading ? <><i className="fas fa-circle-notch fa-spin"></i><span>Syncing Data...</span></> : 'Submit Ledger'}
+                {isUploading ? <><i className="fas fa-circle-notch fa-spin"></i><span>Syncing...</span></> : 'Submit Ledger'}
               </button>
             </form>
           </div>
