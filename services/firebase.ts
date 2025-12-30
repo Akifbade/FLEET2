@@ -1,6 +1,5 @@
-
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, setDoc, query, orderBy } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 
 /**
  * PRODUCTION SETUP:
@@ -24,7 +23,10 @@ let db: any = null;
 
 try {
   app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
+  // Using initializeFirestore with long polling enabled to bypass WebSocket connection issues
+  db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  });
 } catch (err) {
   console.error("Firebase Initialization Error:", err);
 }
@@ -32,7 +34,6 @@ try {
 export { db };
 
 // Helper to convert File to Base64 for database storage ("code base image")
-// This saves the invoice image directly as a string in your Firestore document
 export const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
