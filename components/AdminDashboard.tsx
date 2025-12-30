@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Driver, Job, ReceiptEntry, JobStatus, FleetSettings, SyncSpeed, TripType, Location } from '../types';
+import { Driver, Job, ReceiptEntry, JobStatus, FleetSettings, SyncSpeed, TripType, Location, getEffectiveStatus } from '../types';
 import LiveMap from './LiveMap';
 import FuelTracker from './FuelTracker';
 import DriverPerformance from './DriverPerformance';
@@ -21,15 +21,6 @@ interface AdminDashboardProps {
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-// Utility to determine real-time presence based on heartbeat
-export const getEffectiveStatus = (driver: Driver): 'ONLINE' | 'OFFLINE' | 'ON_JOB' => {
-  const HEARTBEAT_TIMEOUT = 60000; // 60 seconds
-  if (!driver.lastSeen || (Date.now() - driver.lastSeen > HEARTBEAT_TIMEOUT)) {
-    return 'OFFLINE';
-  }
-  return driver.status;
-};
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
   drivers, jobs, fuelEntries, fleetSettings, onUpdateSyncSpeed,

@@ -81,3 +81,12 @@ export interface AppNotification {
   type: 'success' | 'info' | 'error';
   timestamp: number;
 }
+
+// Utility to determine real-time presence based on heartbeat
+export const getEffectiveStatus = (driver: Driver): 'ONLINE' | 'OFFLINE' | 'ON_JOB' => {
+  const HEARTBEAT_TIMEOUT = 60000; // 60 seconds
+  if (!driver.lastSeen || (Date.now() - driver.lastSeen > HEARTBEAT_TIMEOUT)) {
+    return 'OFFLINE';
+  }
+  return driver.status;
+};
