@@ -171,7 +171,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ driver, jobs, fleetSettings
               <button onClick={() => setShowLogForm(false)} className="text-gray-300 hover:text-rose-500 transition text-3xl"><i className="fas fa-times-circle"></i></button>
             </div>
             <form onSubmit={handleLogSubmit} className="p-8 space-y-6">
-              <input name="amount" type="number" required placeholder="Amount (₹)" className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-5 text-lg font-black outline-none" />
+              <input name="amount" type="number" required placeholder="Amount (KWD)" className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-5 text-lg font-black outline-none" />
               <input name="description" placeholder="Supplier / Description" className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-5 text-sm font-bold outline-none" />
               <div className="border-4 border-dashed border-blue-50 rounded-[2rem] p-10 text-center bg-blue-50/20">
                 <input type="file" className="hidden" id="receipt-upload" accept="image/*" capture="environment" required />

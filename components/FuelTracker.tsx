@@ -37,7 +37,7 @@ const FuelTracker: React.FC<FuelTrackerProps> = ({ fuelEntries, drivers }) => {
                       }`}>{entry.type}</span>
                     </td>
                     <td className="px-6 py-4 font-bold text-gray-900">{drivers.find(d => d.id === entry.driverId)?.name}</td>
-                    <td className="px-6 py-4 font-black text-blue-700">₹{entry.amount}</td>
+                    <td className="px-6 py-4 font-black text-blue-700">KWD {entry.amount.toLocaleString()}</td>
                     <td className="px-6 py-4">
                       <button onClick={() => setSelectedReceipt(entry)} className="text-blue-600 hover:text-blue-800 font-bold text-xs bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
                         View Proof
@@ -67,7 +67,7 @@ const FuelTracker: React.FC<FuelTrackerProps> = ({ fuelEntries, drivers }) => {
                 )}
               </div>
               <div className="bg-gray-50 p-5 rounded-2xl flex justify-between">
-                <div><p className="text-[10px] font-black text-gray-400 uppercase">Amount</p><p className="text-2xl font-black text-blue-700">₹{selectedReceipt.amount}</p></div>
+                <div><p className="text-[10px] font-black text-gray-400 uppercase">Amount</p><p className="text-2xl font-black text-blue-700">KWD {selectedReceipt.amount.toLocaleString()}</p></div>
                 <div className="text-right"><p className="text-[10px] font-black text-gray-400 uppercase">Type</p><p className="text-lg font-black text-gray-800">{selectedReceipt.type}</p></div>
               </div>
             </div>

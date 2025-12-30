@@ -6,9 +6,10 @@ interface DriverPerformanceProps {
   drivers: Driver[];
   jobs: Job[];
   receipts: ReceiptEntry[];
+  onSelectDriver: (driverId: string) => void;
 }
 
-const DriverPerformance: React.FC<DriverPerformanceProps> = ({ drivers, jobs, receipts }) => {
+const DriverPerformance: React.FC<DriverPerformanceProps> = ({ drivers, jobs, receipts, onSelectDriver }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {drivers.map(driver => {
@@ -59,13 +60,13 @@ const DriverPerformance: React.FC<DriverPerformanceProps> = ({ drivers, jobs, re
                 <span className="text-gray-500 font-bold flex items-center">
                   <i className="fas fa-gas-pump w-5 text-orange-500"></i> Fuel Cost
                 </span>
-                <span className="font-black text-gray-800">₹{fuelSpend}</span>
+                <span className="font-black text-gray-800">KWD {fuelSpend.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-500 font-bold flex items-center">
                   <i className="fas fa-tools w-5 text-red-500"></i> Maintenance
                 </span>
-                <span className="font-black text-gray-800">₹{maintenanceSpend}</span>
+                <span className="font-black text-gray-800">KWD {maintenanceSpend.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center text-sm border-t border-dashed border-gray-200 pt-3">
                 <span className="text-gray-700 font-black">Total Efficiency</span>
@@ -73,7 +74,10 @@ const DriverPerformance: React.FC<DriverPerformanceProps> = ({ drivers, jobs, re
               </div>
             </div>
 
-            <button className="mt-6 w-full py-3 bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-xl font-bold text-xs transition border border-gray-100">
+            <button 
+              onClick={() => onSelectDriver(driver.id)}
+              className="mt-6 w-full py-3 bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-xl font-bold text-xs transition border border-gray-100"
+            >
               View Detailed History
             </button>
           </div>

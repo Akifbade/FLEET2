@@ -116,7 +116,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           { label: 'Active Fleet', value: drivers.length, icon: 'fa-truck', color: 'bg-blue-50 text-blue-600' },
           { label: 'Total Odometer', value: `${totalKm.toFixed(1)} KM`, icon: 'fa-road', color: 'bg-indigo-50 text-indigo-600' },
           { label: 'Avg Fleet Speed', value: `${avgFleetSpeed} KM/H`, icon: 'fa-gauge-high', color: 'bg-orange-50 text-orange-600' },
-          { label: 'Fuel Spend', value: `₹${fuelEntries.reduce((acc, curr) => acc + curr.amount, 0)}`, icon: 'fa-wallet', color: 'bg-rose-50 text-rose-600' },
+          { label: 'Fuel Spend', value: `KWD ${fuelEntries.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}`, icon: 'fa-wallet', color: 'bg-rose-50 text-rose-600' },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
             <div className={`w-10 h-10 ${stat.color} rounded-xl flex items-center justify-center text-sm mb-4`}><i className={`fas ${stat.icon}`}></i></div>
@@ -139,7 +139,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {activeTab === 'OVERVIEW' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
            <div className="lg:col-span-2 space-y-6">
-              <DriverPerformance drivers={drivers} jobs={jobs} receipts={fuelEntries} />
+              <DriverPerformance drivers={drivers} jobs={jobs} receipts={fuelEntries} onSelectDriver={setSelectedDriverId} />
               <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                 <h3 className="font-black text-gray-900 uppercase tracking-tight mb-4">Live Dispatch Feed</h3>
                 <div className="space-y-4">
@@ -351,7 +351,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white space-y-6 shadow-2xl h-fit">
                           <div className="flex justify-between items-center pb-4 border-b border-white/5">
                              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Total Expenses</p>
-                             <p className="text-xl font-black">₹{driverReceipts.reduce((acc, r) => acc + r.amount, 0)}</p>
+                             <p className="text-xl font-black">KWD {driverReceipts.reduce((acc, r) => acc + r.amount, 0).toLocaleString()}</p>
                           </div>
                           <div className="space-y-4 max-h-[400px] overflow-y-auto scrollbar-hide">
                              {driverReceipts.map(r => (
@@ -361,7 +361,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       <p className="text-xs font-bold text-gray-400">{new Date(r.date).toLocaleDateString()}</p>
                                    </div>
                                    <div className="text-right">
-                                      <p className="font-black">₹{r.amount}</p>
+                                      <p className="font-black">KWD {r.amount}</p>
                                       <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Verified</p>
                                    </div>
                                 </div>
