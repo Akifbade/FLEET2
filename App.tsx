@@ -11,6 +11,7 @@ import Login from './components/Login';
 import BackendStatus from './components/BackendStatus';
 import { db, isConfigured } from './services/firebase';
 import { collection, onSnapshot, addDoc, updateDoc, doc, query, orderBy, setDoc, deleteDoc, arrayUnion } from "firebase/firestore";
+import { subscribeToCollection, addDocument, updateDocument, deleteDocument, isParseConfigured, Parse } from './services/parseServer';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{ role: ViewMode; id?: string } | null>(null);
@@ -37,6 +38,51 @@ const App: React.FC = () => {
     const savedUser = localStorage.getItem('qgo_user');
     if (savedUser) setUser(JSON.parse(savedUser));
 
+    // Use Parse Server
+    if (USE_PARSE_SERVER && isParseConfigured) {
+      let unsubDrivers: any, unsubJobs: any, unsubReceipts: any, unsubSettings: any;
+
+      const setupParse = async () => {
+        try {
+          unsubDrivers = await subscribeToCollection('drivers', (data) => {
+            setDrivers(data as Driver[]);
+            setIsLoading(false);
+          });
+
+          unsubJobs = await subscribeToCollection('jobs', (data) => {
+            setJobs(data as Job[]);
+          }, (q) => q.descending('assignedAt'));
+
+          unsubReceipts = await subscribeToCollection('receipts', (data) => {
+            setReceipts(data as ReceiptEntry[]);
+          }, (q) => q.descending('date'));
+
+          // For settings, fetch single object
+          const SettingsClass = Parse.Object.extend('settings');
+          const settingsQuery = new Parse.Query(SettingsClass);
+          const settingsObj = await settingsQuery.first();
+          if (settingsObj) {
+            setFleetSettings(settingsObj.toJSON() as FleetSettings);
+          }
+        } catch (error) {
+          console.error('Parse setup error:', error);
+          setDrivers(MOCK_DRIVERS);
+          setJobs(MOCK_JOBS);
+          setIsLoading(false);
+        }
+      };
+
+      setupParse();
+
+      return () => {
+        if (unsubDrivers) unsubDrivers();
+        if (unsubJobs) unsubJobs();
+        if (unsubReceipts) unsubReceipts();
+        if (unsubSettings) unsubSettings();
+      };
+    }
+
+    // Use Firebase (existing logic)
     if (!isConfigured || !db) {
       setDrivers(MOCK_DRIVERS);
       setJobs(MOCK_JOBS);
@@ -103,12 +149,10 @@ const App: React.FC = () => {
   };
 
   const handleUpdateJobStatus = async (jobId: string, status: JobStatus) => {
-    if (!db) return;
-    try {
-      const jobRef = doc(db, "jobs", jobId);
-      const targetJob = jobs.find(j => j.id === jobId);
-      if (!targetJob) return;
+    const targetJob = jobs.find(j => j.id === jobId);
+    if (!targetJob) return;
 
+    try {
       const updates: any = { status };
       const now = new Date().toISOString();
 
@@ -127,7 +171,6 @@ const App: React.FC = () => {
         updates.endTime = now;
         if (endPos) updates.endLocation = endPos;
 
-        // Use the cumulative route data if available, fallback to straight line
         const finalRoute = [...(targetJob.route || [])];
         if (endPos) finalRoute.push(endPos);
         
@@ -143,10 +186,20 @@ const App: React.FC = () => {
         addNotification(`Delivery Finished: Arrived at ${targetJob.destination} (${realKm} KM)`, 'success');
       }
 
-      await updateDoc(jobRef, updates);
-      await updateDoc(doc(db, "drivers", targetJob.driverId), { 
-        status: status === JobStatus.IN_PROGRESS ? 'ON_JOB' : 'ONLINE' 
-      });
+      // Use Parse Server
+      if (USE_PARSE_SERVER) {
+        await updateDocument('jobs', jobId, updates);
+        await updateDocument('drivers', targetJob.driverId, { 
+          status: status === JobStatus.IN_PROGRESS ? 'ON_JOB' : 'ONLINE' 
+        });
+      } else {
+        // Use Firebase
+        if (!db) return;
+        await updateDoc(doc(db, "jobs", jobId), updates);
+        await updateDoc(doc(db, "drivers", targetJob.driverId), { 
+          status: status === JobStatus.IN_PROGRESS ? 'ON_JOB' : 'ONLINE' 
+        });
+      }
     } catch (e) { 
       addNotification('Update failed.', 'error');
       console.error(e); 
@@ -154,10 +207,18 @@ const App: React.FC = () => {
   };
 
   const handleAddJob = async (newJob: Job) => {
-    if (!db) return;
     try { 
-      const { id, ...data } = newJob; 
-      await addDoc(collection(db, "jobs"), data); 
+      const { id, ...data } = newJob;
+      
+      // Use Parse Server
+      if (USE_PARSE_SERVER) {
+        await addDocument('jobs', data);
+      } else {
+        // Use Firebase
+        if (!db) return;
+        await addDoc(collection(db, "jobs"), data);
+      }
+      
       addNotification(`Job Dispatch Successful`, 'info');
     } catch (e) { 
       addNotification('Dispatch failed.', 'error');
@@ -207,14 +268,49 @@ const App: React.FC = () => {
             fuelEntries={receipts}
             fleetSettings={fleetSettings}
             onUpdateSyncSpeed={async (speed) => {
-              if (!db) return;
-              await updateDoc(doc(db, "settings", "fleet"), { syncSpeed: speed, updatedAt: new Date().toISOString() });
+              if (USE_PARSE_SERVER) {
+                // For Parse, we need to find the settings object first
+                const SettingsClass = Parse.Object.extend('settings');
+                const query = new Parse.Query(SettingsClass);
+                const settingsObj = await query.first();
+                if (settingsObj) {
+                  settingsObj.set('syncSpeed', speed);
+                  settingsObj.set('updatedAt', new Date().toISOString());
+                  await settingsObj.save();
+                }
+              } else {
+                if (!db) return;
+                await updateDoc(doc(db, "settings", "fleet"), { syncSpeed: speed, updatedAt: new Date().toISOString() });
+              }
               addNotification(`Sync mode set to ${speed}`, 'info');
             }}
             onAddJob={handleAddJob}
-            onAddDriver={async (d) => { if (!db) return; await setDoc(doc(db, "drivers", d.id), d); addNotification('Driver Registered'); }}
-            onUpdateDriver={async (d) => { if (!db) return; await updateDoc(doc(db, "drivers", d.id), { ...d }); }}
-            onDeleteDriver={async (id) => { if (!db) return; await deleteDoc(doc(db, "drivers", id)); addNotification('Driver Removed', 'error'); }}
+            onAddDriver={async (d) => { 
+              if (USE_PARSE_SERVER) {
+                await addDocument('drivers', d);
+              } else {
+                if (!db) return;
+                await setDoc(doc(db, "drivers", d.id), d);
+              }
+              addNotification('Driver Registered'); 
+            }}
+            onUpdateDriver={async (d) => { 
+              if (USE_PARSE_SERVER) {
+                await updateDocument('drivers', d.id, d);
+              } else {
+                if (!db) return;
+                await updateDoc(doc(db, "drivers", d.id), { ...d });
+              }
+            }}
+            onDeleteDriver={async (id) => { 
+              if (USE_PARSE_SERVER) {
+                await deleteDocument('drivers', id);
+              } else {
+                if (!db) return;
+                await deleteDoc(doc(db, "drivers", id));
+              }
+              addNotification('Driver Removed', 'error'); 
+            }}
             addNotification={addNotification}
           />
         ) : (
@@ -224,8 +320,12 @@ const App: React.FC = () => {
             fleetSettings={fleetSettings}
             onUpdateJobStatus={handleUpdateJobStatus}
             onLogFuel={async (entry) => { 
-              if (!db) return; 
-              await addDoc(collection(db, "receipts"), entry); 
+              if (USE_PARSE_SERVER) {
+                await addDocument('receipts', entry);
+              } else {
+                if (!db) return;
+                await addDoc(collection(db, "receipts"), entry);
+              }
               addNotification('Financial Record Submitted', 'success');
             }}
           />
