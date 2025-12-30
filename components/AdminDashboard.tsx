@@ -59,9 +59,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       if (coordsToResolve.length > 0) {
         try {
+          const uniqueCoords = Array.from(new Set(coordsToResolve));
           const resp = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
-            contents: `For these coordinates, provide a short human-readable landmark or area name (max 3 words each) in English. Return as JSON object where key is the coordinate string: ${coordsToResolve.join(', ')}`,
+            contents: `For these coordinates, provide a short human-readable landmark or area name (max 3 words each) in English. Return as JSON object where key is the coordinate string: ${uniqueCoords.join(', ')}`,
             config: { responseMimeType: "application/json" }
           });
           const parsed = JSON.parse(resp.text || '{}');
@@ -134,6 +135,49 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         ))}
       </div>
 
+      {/* Tab Content */}
+      {activeTab === 'OVERVIEW' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+           <div className="lg:col-span-2 space-y-6">
+              <DriverPerformance drivers={drivers} jobs={jobs} receipts={fuelEntries} />
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                <h3 className="font-black text-gray-900 uppercase tracking-tight mb-4">Live Dispatch Feed</h3>
+                <div className="space-y-4">
+                  {jobs.slice(0, 5).map(job => (
+                    <div key={job.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-2 h-2 rounded-full ${job.status === JobStatus.IN_PROGRESS ? 'bg-orange-500 animate-pulse' : 'bg-blue-500'}`}></div>
+                        <div>
+                          <p className="text-xs font-black text-gray-900">{job.origin} → {job.destination}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">{job.tripType} • {drivers.find(d => d.id === job.driverId)?.name}</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black text-gray-500 uppercase">{job.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+           </div>
+           <div className="space-y-6">
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm h-fit">
+                <h3 className="font-black text-gray-900 uppercase tracking-tight text-xl mb-6">Terminal Settings</h3>
+                <div className="space-y-4">
+                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Update Frequency</p>
+                   <div className="grid grid-cols-1 gap-3">
+                     {(['FAST', 'MEDIUM', 'SLOW'] as SyncSpeed[]).map(speed => (
+                       <button key={speed} onClick={() => onUpdateSyncSpeed(speed)} className={`w-full p-5 rounded-2xl border-2 text-left flex justify-between items-center transition-all ${fleetSettings.syncSpeed === speed ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-gray-50 border-gray-100 text-gray-500 hover:border-blue-200'}`}>
+                         <span className="font-black uppercase text-[11px] tracking-widest">{speed} Mode</span>
+                         {fleetSettings.syncSpeed === speed && <i className="fas fa-check-circle"></i>}
+                       </button>
+                     ))}
+                   </div>
+                </div>
+              </div>
+              <FuelTracker fuelEntries={fuelEntries} drivers={drivers} />
+           </div>
+        </div>
+      )}
+
       {activeTab === 'MAP' && <div className="h-[650px] bg-white rounded-[3rem] overflow-hidden border border-gray-100 shadow-inner"><LiveMap drivers={drivers} /></div>}
 
       {activeTab === 'REPORTS' && (
@@ -147,7 +191,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  <tr>
                    <th className="px-8 py-5">Job Details</th>
                    <th className="px-8 py-5 text-center">KM / Speed</th>
-                   <th className="px-8 py-5">Address Resolution</th>
+                   <th className="px-8 py-5">Location Details</th>
                    <th className="px-8 py-5">Timeline</th>
                    <th className="px-8 py-5 text-right">Manifest</th>
                  </tr>
@@ -167,7 +211,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                      </td>
                      <td className="px-8 py-6 text-center">
                         <div className="flex flex-col space-y-1 items-center">
-                          <span className="bg-blue-50 text-blue-600 px-6 py-2 rounded-full text-[10px] font-black border border-blue-100 shadow-sm">{job.distanceKm || 0} KM</span>
+                          <span className="bg-blue-50 text-blue-600 px-6 py-2 rounded-full text-[10px] font-black border border-blue-100 shadow-sm">{job.distanceKm?.toFixed(2) || 0} KM</span>
                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{job.avgSpeed || 0} KM/H AVG</span>
                         </div>
                      </td>
@@ -175,11 +219,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <div className="space-y-2">
                            <div className="flex items-center space-x-2 text-[10px] font-black text-emerald-600 uppercase">
                              <i className="fas fa-location-dot"></i>
-                             <span>{addressMap[`${job.startLocation?.lat},${job.startLocation?.lng}`] || 'Resolving Address...'}</span>
+                             <span>{addressMap[`${job.startLocation?.lat},${job.startLocation?.lng}`] || 'Origin Hub'}</span>
                            </div>
                            <div className="flex items-center space-x-2 text-[10px] font-black text-rose-500 uppercase">
                              <i className="fas fa-location-arrow"></i>
-                             <span>{addressMap[`${job.endLocation?.lat},${job.endLocation?.lng}`] || 'Resolving Address...'}</span>
+                             <span>{addressMap[`${job.endLocation?.lat},${job.endLocation?.lng}`] || 'Target Hub'}</span>
                            </div>
                         </div>
                      </td>
@@ -215,7 +259,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="grid grid-cols-2 gap-3 mb-6">
                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-center">
                       <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Odometer</p>
-                      <p className="text-sm font-black text-gray-900">{dKm.toFixed(1)} KM</p>
+                      <p className="text-sm font-black text-gray-900">{dKm.toFixed(2)} KM</p>
                    </div>
                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-center">
                       <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Successful</p>
@@ -228,6 +272,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           })}
         </div>
       )}
+
+      {activeTab === 'AI' && <div className="bg-white rounded-[2.5rem] p-12 border border-gray-100 text-gray-700 leading-relaxed text-lg font-medium whitespace-pre-wrap animate-in slide-in-from-bottom-4">{aiInsight}</div>}
 
       {/* REPLAY DOSSIER MODAL */}
       {selectedDriverId && selectedDriver && (
@@ -247,13 +293,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
               
               <div className="flex-grow overflow-y-auto p-10 space-y-12 scrollbar-hide">
-                 {/* High-Level Stats */}
                  <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     {[
-                       { label: 'Cumulative Dist', value: `${driverTotalKm} KM`, color: 'bg-blue-50 text-blue-600', sub: 'Calculated via GPS' },
+                       { label: 'Cumulative Dist', value: `${driverTotalKm.toFixed(2)} KM`, color: 'bg-blue-50 text-blue-600', sub: 'Real GPS Data' },
                        { label: 'Active Status', value: selectedDriver.status, color: 'bg-emerald-50 text-emerald-600', sub: 'Terminal Live' },
                        { label: 'Fuel Refills', value: fuelEntries.filter(f => f.driverId === selectedDriver.id && f.type === 'FUEL').length, color: 'bg-orange-50 text-orange-600', sub: 'Verified Proofs' },
-                       { label: 'Duty Efficiency', value: 'High', color: 'bg-indigo-50 text-indigo-600', sub: 'System Rated' },
+                       { label: 'Avg Velocity', value: `${Math.round(driverJobs.reduce((acc, j) => acc + (j.avgSpeed || 0), 0) / (driverJobs.length || 1))} KM/H`, color: 'bg-indigo-50 text-indigo-600', sub: 'Mission Metric' },
                     ].map((s, i) => (
                        <div key={i} className={`${s.color} p-6 rounded-[2.5rem] border border-white shadow-sm`}>
                           <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-70">{s.label}</p>
@@ -264,9 +309,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  </div>
 
                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                    {/* Mission History (Detailed Timeline) */}
                     <div className="lg:col-span-2 space-y-6">
-                       <h5 className="font-black uppercase text-gray-900 tracking-tight text-xl px-2">Mission Replay & Replay Log</h5>
+                       <h5 className="font-black uppercase text-gray-900 tracking-tight text-xl px-2">Mission Replay Log</h5>
                        <div className="space-y-4">
                           {driverJobs.filter(j => j.status === JobStatus.COMPLETED).map(job => (
                              <div key={job.id} className="bg-white border-2 border-gray-50 p-8 rounded-[2.5rem] shadow-sm hover:border-blue-100 transition group relative overflow-hidden">
@@ -277,12 +321,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       <h4 className="text-2xl font-black text-gray-900 tracking-tight">{job.origin} <i className="fas fa-chevron-right text-gray-200 mx-2 text-sm"></i> {job.destination}</h4>
                                    </div>
                                    <div className="text-right">
-                                      <p className="text-3xl font-black text-gray-900">{job.distanceKm || '0.00'} <span className="text-sm text-gray-400">KM</span></p>
+                                      <p className="text-3xl font-black text-gray-900">{job.distanceKm?.toFixed(2) || '0.00'} <span className="text-sm text-gray-400">KM</span></p>
                                       <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1">Status: Success</p>
                                    </div>
                                 </div>
                                 
-                                {/* Detailed Timeline Breakdown */}
                                 <div className="bg-gray-50 rounded-3xl p-6 space-y-4 border border-gray-100">
                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2">Mission Telemetry</p>
                                    <div className="flex justify-between items-center text-xs font-bold">
@@ -290,12 +333,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       <span className="text-gray-900">{new Date(job.startTime!).toLocaleTimeString()} ({addressMap[`${job.startLocation?.lat},${job.startLocation?.lng}`] || 'Origin Hub'})</span>
                                    </div>
                                    <div className="flex justify-between items-center text-xs font-bold">
-                                      <span className="text-gray-400">Peak Velocity</span>
-                                      <span className="text-gray-900">{Math.round((job.avgSpeed || 0) * 1.2)} KM/H</span>
-                                   </div>
-                                   <div className="flex justify-between items-center text-xs font-bold">
-                                      <span className="text-gray-400">Stops Detected</span>
-                                      <span className="text-emerald-600">Zero (Continuous Transit)</span>
+                                      <span className="text-gray-400">Avg Velocity</span>
+                                      <span className="text-gray-900">{job.avgSpeed || 0} KM/H</span>
                                    </div>
                                    <div className="flex justify-between items-center text-xs font-bold">
                                       <span className="text-gray-400">Final Arrival</span>
@@ -307,13 +346,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        </div>
                     </div>
 
-                    {/* Side Expenses */}
                     <div className="space-y-6">
                        <h5 className="font-black uppercase text-gray-900 tracking-tight text-xl px-2">Expense Ledger</h5>
-                       <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white space-y-6 shadow-2xl">
+                       <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white space-y-6 shadow-2xl h-fit">
                           <div className="flex justify-between items-center pb-4 border-b border-white/5">
-                             <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Monthly Fuel</p>
-                             <p className="text-xl font-black">₹{driverReceipts.filter(r => r.type === 'FUEL').reduce((acc, r) => acc + r.amount, 0)}</p>
+                             <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Total Expenses</p>
+                             <p className="text-xl font-black">₹{driverReceipts.reduce((acc, r) => acc + r.amount, 0)}</p>
                           </div>
                           <div className="space-y-4 max-h-[400px] overflow-y-auto scrollbar-hide">
                              {driverReceipts.map(r => (
@@ -340,11 +378,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Unit Passcode</p>
                        <p className="text-xl font-black tracking-[0.4em]">{selectedDriver.password}</p>
                     </div>
-                    <div className="w-px h-12 bg-white/10"></div>
-                    <div>
-                       <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2">Active Jobs</p>
-                       <p className="text-xl font-black">{driverJobs.filter(j => j.status === JobStatus.IN_PROGRESS).length}</p>
-                    </div>
                  </div>
                  <button onClick={() => onDeleteDriver(selectedDriver.id)} className="bg-rose-600 text-white px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-2xl hover:bg-rose-700">Decommission Unit</button>
               </div>
@@ -352,7 +385,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* MODALS (Keep existing Job/Driver Modals) */}
+      {/* MODALS */}
       {showJobModal && (
         <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[200] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xl rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
@@ -379,7 +412,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </select>
               </div>
               <textarea value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} placeholder="Shipment Narrative" className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold h-24" />
-              <button type="submit" disabled={isUploading} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition disabled:opacity-50">Confirm Dispatch</button>
+              <button type="submit" disabled={isUploading} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl transition disabled:opacity-50">Confirm Dispatch</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showDriverModal && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl">
+            <div className="p-8 border-b border-gray-100 bg-gray-50">
+              <h3 className="font-black text-gray-900 uppercase tracking-tight text-2xl text-center">Unit Enrollment</h3>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              onAddDriver({ ...newDriver, status: 'OFFLINE' } as Driver);
+              setShowDriverModal(false);
+            }} className="p-8 space-y-5">
+              <input required value={newDriver.name} onChange={e => setNewDriver({...newDriver, name: e.target.value})} placeholder="Driver Full Name" className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold outline-none" />
+              <input required value={newDriver.id} onChange={e => setNewDriver({...newDriver, id: e.target.value.toUpperCase()})} placeholder="Unit ID" className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold outline-none uppercase" />
+              <input required value={newDriver.vehicleNo} onChange={e => setNewDriver({...newDriver, vehicleNo: e.target.value.toUpperCase()})} placeholder="Plate Number" className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold outline-none uppercase" />
+              <input required value={newDriver.password} onChange={e => setNewDriver({...newDriver, password: e.target.value})} placeholder="Access PIN" className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold outline-none" />
+              <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl">Activate Unit</button>
             </form>
           </div>
         </div>
