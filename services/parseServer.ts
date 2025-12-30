@@ -7,11 +7,17 @@ import Parse from 'parse';
 
 const PARSE_APP_ID = 'QGO_FLEET_APP_ID';
 const PARSE_JS_KEY = 'QGO_MASTER_KEY_SECURE_2025';
-const PARSE_SERVER_URL = 'http://148.230.107.155:1337/parse';
+// Use environment variable for flexible deployment
+const PARSE_SERVER_URL = import.meta.env.VITE_PARSE_SERVER_URL || 'http://148.230.107.155:1337/parse';
 
 // Initialize Parse
-Parse.initialize(PARSE_APP_ID, PARSE_JS_KEY);
-Parse.serverURL = PARSE_SERVER_URL;
+try {
+  Parse.initialize(PARSE_APP_ID, PARSE_JS_KEY);
+  Parse.serverURL = PARSE_SERVER_URL;
+  console.log('✅ Parse Server initialized:', PARSE_SERVER_URL);
+} catch (error) {
+  console.error('❌ Parse Server initialization failed:', error);
+}
 
 export { Parse };
 
