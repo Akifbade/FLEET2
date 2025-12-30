@@ -6,6 +6,14 @@ export enum JobStatus {
   CANCELLED = 'CANCELLED'
 }
 
+export enum TripType {
+  LOCAL_MOVE = 'Local Move',
+  WAREHOUSE_SHIPMENT = 'Warehouse Shipment',
+  AIRPORT_CARGO = 'Airport Cargo',
+  LONG_HAUL = 'Long Haul',
+  URGENT_DELIVERY = 'Urgent Delivery'
+}
+
 export interface Location {
   lat: number;
   lng: number;
@@ -38,6 +46,7 @@ export interface Job {
   origin: string;
   destination: string;
   status: JobStatus;
+  tripType: TripType;
   startTime?: string;
   endTime?: string;
   startLocation?: Location;
@@ -46,6 +55,7 @@ export interface Job {
   avgSpeed?: number;
   assignedAt: string;
   description: string;
+  attachmentUrl?: string; // Digital Manifest / Waybill
 }
 
 export interface Driver {
@@ -59,3 +69,10 @@ export interface Driver {
 }
 
 export type ViewMode = 'ADMIN' | 'DRIVER';
+
+export interface AppNotification {
+  id: string;
+  message: string;
+  type: 'success' | 'info' | 'error';
+  timestamp: number;
+}

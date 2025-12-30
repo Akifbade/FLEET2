@@ -1,4 +1,5 @@
-import { Driver, Job, JobStatus } from './types';
+
+import { Driver, Job, JobStatus, TripType } from './types';
 
 export const LOGO_URL = 'https://qgocargo.com/logo.png';
 
@@ -15,6 +16,8 @@ export const MOCK_JOBS: Job[] = [
     origin: 'Delhi Hub',
     destination: 'Jaipur Warehouse',
     status: JobStatus.IN_PROGRESS,
+    // Fix: Added missing required tripType property
+    tripType: TripType.URGENT_DELIVERY,
     assignedAt: new Date().toISOString(),
     description: 'Urgent delivery of electronics',
     startTime: new Date(Date.now() - 3600000).toISOString(),
@@ -25,6 +28,8 @@ export const MOCK_JOBS: Job[] = [
     origin: 'Mumbai Port',
     destination: 'Pune Distribution',
     status: JobStatus.PENDING,
+    // Fix: Added missing required tripType property
+    tripType: TripType.WAREHOUSE_SHIPMENT,
     assignedAt: new Date().toISOString(),
     description: 'Monthly FMCG refill',
   }
