@@ -11,7 +11,7 @@ import Login from './components/Login';
 import BackendStatus from './components/BackendStatus';
 import { db, isConfigured } from './services/firebase';
 import { collection, onSnapshot, addDoc, updateDoc, doc, query, orderBy, setDoc, deleteDoc, arrayUnion } from "firebase/firestore";
-import { subscribeToCollection, addDocument, updateDocument, deleteDocument, isParseConfigured, Parse } from './services/parseServer';
+import { subscribeToCollection, addDocument, updateDocument, deleteDocument, isParseConfigured } from './services/parseRestAPI';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{ role: ViewMode; id?: string } | null>(null);

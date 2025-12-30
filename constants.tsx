@@ -3,8 +3,8 @@ import { Driver, Job, JobStatus, TripType } from './types';
 
 export const LOGO_URL = 'https://qgocargo.com/logo.png';
 
-// Backend Configuration - Temporarily using Firebase due to Parse SDK bundling issues
-export const USE_PARSE_SERVER = false; // Set to true to use Parse Server instead of Firebase
+// Backend Configuration - Using Parse Server REST API (without SDK)
+export const USE_PARSE_SERVER = true; // Using REST API approach
 
 export const MOCK_DRIVERS: Driver[] = [
   { id: 'D1', name: 'Rajesh Kumar', vehicleNo: 'DL-1RA-1234', password: '1234', status: 'ON_JOB', phone: '+91 9876543210', lastKnownLocation: { lat: 28.6139, lng: 77.2090 } },
