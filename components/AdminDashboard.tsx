@@ -99,7 +99,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const selectedDriver = drivers.find(d => d.id === selectedDriverId);
-  // Fix: Calculate stats for the selected driver detail modal
   const driverJobs = selectedDriver ? jobs.filter(j => j.driverId === selectedDriver.id) : [];
   const driverTotalKm = driverJobs.filter(j => j.status === JobStatus.COMPLETED).reduce((acc, curr) => acc + (curr.distanceKm || 0), 0);
   const driverReceipts = selectedDriver ? fuelEntries.filter(r => r.driverId === selectedDriver.id) : [];
@@ -205,117 +204,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {activeTab === 'MAP' && (
-        <div className="h-[700px] bg-white rounded-[3rem] overflow-hidden border border-gray-100 shadow-inner relative">
+        <div className="h-[750px] bg-white rounded-[3rem] overflow-hidden border border-gray-100 shadow-inner relative">
           <LiveMap 
             drivers={drivers} 
+            jobs={jobs}
             selectedJobId={selectedJobForRadar} 
             route={radarJob?.route || []}
           />
-          
-          {/* Active Missions Sidebar on Map */}
-          <div className="absolute top-6 right-6 z-[1000] w-72 space-y-4 pointer-events-none">
-             <div className="bg-white/95 backdrop-blur-xl p-5 rounded-[2rem] border border-gray-100 shadow-2xl pointer-events-auto max-h-[600px] overflow-y-auto scrollbar-hide">
-                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 border-b border-gray-100 pb-2 flex justify-between">
-                   <span>Active Missions</span>
-                   <span className="text-emerald-500">{activeMissions.length} Live</span>
-                </h4>
-                <div className="space-y-3">
-                   {activeMissions.length === 0 ? (
-                     <p className="text-[9px] font-black text-gray-300 uppercase text-center py-4 italic">No ongoing trips</p>
-                   ) : activeMissions.map(j => (
-                     <button 
-                       key={j.id} 
-                       onClick={() => setSelectedJobForRadar(j.id)}
-                       className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedJobForRadar === j.id ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-gray-50 border-gray-100 text-gray-800 hover:border-blue-200'}`}
-                     >
-                        <div className="flex justify-between items-start mb-2">
-                           <span className="text-[8px] font-black uppercase tracking-widest opacity-70">Unit: {drivers.find(d => d.id === j.driverId)?.vehicleNo}</span>
-                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        </div>
-                        <p className="text-[11px] font-black truncate">{j.origin} → {j.destination}</p>
-                        {selectedJobForRadar === j.id && (
-                           <div className="mt-3 pt-3 border-t border-white/20 grid grid-cols-2 gap-2">
-                              <div>
-                                 <p className="text-[7px] uppercase font-black opacity-70">Live Speed</p>
-                                 <p className="text-xs font-black">{drivers.find(d => d.id === j.driverId)?.lastKnownLocation?.speed || 0} KM/H</p>
-                              </div>
-                              <div className="text-right">
-                                 <p className="text-[7px] uppercase font-black opacity-70">Duration</p>
-                                 <p className="text-xs font-black">{Math.floor((Date.now() - new Date(j.startTime!).getTime()) / 60000)}m</p>
-                              </div>
-                           </div>
-                        )}
-                     </button>
-                   ))}
-                </div>
-                {selectedJobForRadar && (
-                  <button 
-                    onClick={() => setSelectedJobForRadar(null)}
-                    className="w-full mt-4 py-3 bg-rose-50 text-rose-600 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-600 hover:text-white transition border border-rose-100"
-                  >
-                    Close Radar View
-                  </button>
-                )}
-             </div>
-          </div>
-
-          {/* Radar Telemetry HUD */}
-          {selectedJobForRadar && radarJob && radarDriver && (
-            <div className="absolute bottom-10 left-10 z-[1000] pointer-events-none w-full max-w-sm">
-               <div className="bg-slate-900/95 backdrop-blur-2xl rounded-[2.5rem] p-8 text-white shadow-2xl border border-white/10 pointer-events-auto animate-in slide-in-from-left-8">
-                  <div className="flex justify-between items-start mb-6">
-                     <div>
-                        <h4 className="text-2xl font-black tracking-tight">{radarDriver.name}</h4>
-                        <p className="text-blue-400 text-[9px] font-black uppercase tracking-widest">{radarDriver.vehicleNo} • Mission ID: {radarJob.id}</p>
-                     </div>
-                     <div className="text-right">
-                        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[8px] font-black uppercase tracking-widest">
-                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                           <span>Real-time Connection</span>
-                        </div>
-                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-6 mb-8">
-                     <div className="text-center">
-                        <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Velocity</p>
-                        <div className="flex items-baseline justify-center">
-                           <span className="text-3xl font-black text-white">{Math.round(radarDriver.lastKnownLocation?.speed || 0)}</span>
-                           <span className="text-[8px] font-black text-gray-400 ml-1">K/H</span>
-                        </div>
-                     </div>
-                     <div className="text-center border-x border-white/5">
-                        <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Path Log</p>
-                        <div className="flex items-baseline justify-center">
-                           <span className="text-3xl font-black text-blue-400">{radarJob.route?.length || 0}</span>
-                           <span className="text-[8px] font-black text-gray-400 ml-1">PTS</span>
-                        </div>
-                     </div>
-                     <div className="text-center">
-                        <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Elapsed</p>
-                        <div className="flex items-baseline justify-center">
-                           <span className="text-3xl font-black text-white">{Math.floor((Date.now() - new Date(radarJob.startTime!).getTime()) / 60000)}</span>
-                           <span className="text-[8px] font-black text-gray-400 ml-1">MIN</span>
-                        </div>
-                     </div>
-                  </div>
-
-                  <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
-                     <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest mb-4">
-                        <span className="text-gray-500">Route Progress</span>
-                        <span className="text-blue-400">Synchronized</span>
-                     </div>
-                     <div className="relative h-1 bg-white/10 rounded-full overflow-hidden">
-                        <div className="absolute top-0 left-0 h-full bg-blue-500 w-[65%] shadow-[0_0_15px_#3b82f6]"></div>
-                     </div>
-                     <div className="mt-4 flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase italic">
-                        <span>{radarJob.origin}</span>
-                        <span>{radarJob.destination}</span>
-                     </div>
-                  </div>
-               </div>
-            </div>
-          )}
         </div>
       )}
 
