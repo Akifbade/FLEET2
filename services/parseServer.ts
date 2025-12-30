@@ -10,14 +10,23 @@ const PARSE_JS_KEY = 'QGO_MASTER_KEY_SECURE_2025';
 // Use environment variable for flexible deployment
 const PARSE_SERVER_URL = import.meta.env.VITE_PARSE_SERVER_URL || 'https://qgocargo.cloud/parse';
 
-// Initialize Parse
+// Initialize Parse with proper browser configuration
+let isInitialized = false;
 try {
   Parse.initialize(PARSE_APP_ID, PARSE_JS_KEY);
   Parse.serverURL = PARSE_SERVER_URL;
+  
+  // Disable automatic user for browser environment
+  Parse.User.enableUnsafeCurrentUser();
+  
+  isInitialized = true;
   console.log('✅ Parse Server initialized:', PARSE_SERVER_URL);
 } catch (error) {
   console.error('❌ Parse Server initialization failed:', error);
+  isInitialized = false;
 }
+
+export const isParseConfigured = isInitialized;
 
 export { Parse };
 
@@ -118,5 +127,3 @@ export const fileToBase64 = (file: File): Promise<string> => {
     reader.onerror = (error) => reject(error);
   });
 };
-
-export const isParseConfigured = true;
