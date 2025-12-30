@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { ViewMode, Driver, Job, ReceiptEntry, JobStatus, FleetSettings, SyncSpeed, Location, TripType, AppNotification } from './types';
-import { LOGO_URL, MOCK_DRIVERS, MOCK_JOBS } from './constants';
+import { LOGO_URL, MOCK_DRIVERS, MOCK_JOBS, USE_PARSE_SERVER } from './constants';
 import AdminDashboard from './components/AdminDashboard';
 import DriverPortal from './components/DriverPortal';
 import CustomerTracking from './components/CustomerTracking';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Login from './components/Login';
+import BackendStatus from './components/BackendStatus';
 import { db, isConfigured } from './services/firebase';
 import { collection, onSnapshot, addDoc, updateDoc, doc, query, orderBy, setDoc, deleteDoc, arrayUnion } from "firebase/firestore";
 
@@ -195,6 +196,8 @@ const App: React.FC = () => {
       </div>
 
       <Navbar user={user} onLogout={() => { setUser(null); localStorage.removeItem('qgo_user'); }} logoUrl={LOGO_URL} />
+      
+      <BackendStatus useParseServer={USE_PARSE_SERVER} />
       
       <main className="flex-grow container mx-auto px-4 py-8">
         {user.role === 'ADMIN' ? (
