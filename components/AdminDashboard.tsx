@@ -18,13 +18,14 @@ interface AdminDashboardProps {
   onAddDriver: (driver: Driver) => void;
   onUpdateDriver: (driver: Driver) => void;
   onDeleteDriver: (driverId: string) => void;
+  addNotification: (message: string, type?: 'success' | 'info' | 'error') => void;
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
   drivers, jobs, fuelEntries, fleetSettings, onUpdateSyncSpeed,
-  onAddJob, onAddDriver, onUpdateDriver, onDeleteDriver 
+  onAddJob, onAddDriver, onUpdateDriver, onDeleteDriver, addNotification
 }) => {
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'MAP' | 'REPORTS' | 'DRIVERS' | 'AI'>('OVERVIEW');
   const [aiInsight, setAiInsight] = useState<string>('Analyzing fleet velocity and efficiency...');
@@ -98,6 +99,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const copyTrackingLink = (jobId: string) => {
+    const url = `${window.location.origin}${window.location.pathname}?track=${jobId}`;
+    navigator.clipboard.writeText(url);
+    addNotification('Tracking link copied to clipboard!', 'success');
+  };
+
   const selectedDriver = drivers.find(d => d.id === selectedDriverId);
   const driverJobs = selectedDriver ? jobs.filter(j => j.driverId === selectedDriver.id) : [];
   const driverTotalKm = driverJobs.filter(j => j.status === JobStatus.COMPLETED).reduce((acc, curr) => acc + (curr.distanceKm || 0), 0);
@@ -169,6 +176,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                       <div className="flex items-center space-x-3">
                          <span className="text-[10px] font-black text-gray-500 uppercase">{job.status}</span>
+                         <button 
+                           onClick={() => copyTrackingLink(job.id)}
+                           className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border border-blue-100 hover:bg-blue-600 hover:text-white transition"
+                           title="Copy Customer Tracking Link"
+                         >
+                           <i className="fas fa-share-alt"></i>
+                         </button>
                          {job.status === JobStatus.IN_PROGRESS && (
                            <button 
                              onClick={() => { setSelectedJobForRadar(job.id); setActiveTab('MAP'); }}
@@ -255,12 +269,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                      </td>
                      <td className="px-8 py-6 text-right">
-                        <button 
-                          onClick={() => { setSelectedJobForRadar(job.id); setActiveTab('MAP'); }}
-                          className="bg-blue-600 text-white px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-200 hover:bg-slate-900 transition"
-                        >
-                          View Replay
-                        </button>
+                        <div className="flex justify-end space-x-2">
+                          <button 
+                            onClick={() => copyTrackingLink(job.id)}
+                            className="bg-gray-100 text-gray-600 px-4 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition"
+                            title="Copy Tracking Link"
+                          >
+                            <i className="fas fa-share-alt"></i>
+                          </button>
+                          <button 
+                            onClick={() => { setSelectedJobForRadar(job.id); setActiveTab('MAP'); }}
+                            className="bg-blue-600 text-white px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-200 hover:bg-slate-900 transition"
+                          >
+                            View Replay
+                          </button>
+                        </div>
                      </td>
                    </tr>
                  ))}

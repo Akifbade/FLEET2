@@ -4,6 +4,7 @@ import { ViewMode, Driver, Job, ReceiptEntry, JobStatus, FleetSettings, SyncSpee
 import { LOGO_URL, MOCK_DRIVERS, MOCK_JOBS } from './constants';
 import AdminDashboard from './components/AdminDashboard';
 import DriverPortal from './components/DriverPortal';
+import CustomerTracking from './components/CustomerTracking';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Login from './components/Login';
@@ -18,6 +19,10 @@ const App: React.FC = () => {
   const [fleetSettings, setFleetSettings] = useState<FleetSettings>({ syncSpeed: 'MEDIUM', updatedAt: '' });
   const [isLoading, setIsLoading] = useState(true);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  // Check for tracking ID in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const trackId = urlParams.get('track');
 
   const addNotification = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -166,6 +171,8 @@ const App: React.FC = () => {
     </div>
   );
 
+  if (trackId) return <CustomerTracking jobId={trackId} />;
+
   if (!user) return <Login onLogin={(role, id) => {
     const data = { role, id };
     setUser(data);
@@ -205,6 +212,7 @@ const App: React.FC = () => {
             onAddDriver={async (d) => { if (!db) return; await setDoc(doc(db, "drivers", d.id), d); addNotification('Driver Registered'); }}
             onUpdateDriver={async (d) => { if (!db) return; await updateDoc(doc(db, "drivers", d.id), { ...d }); }}
             onDeleteDriver={async (id) => { if (!db) return; await deleteDoc(doc(db, "drivers", id)); addNotification('Driver Removed', 'error'); }}
+            addNotification={addNotification}
           />
         ) : (
           <DriverPortal 
