@@ -213,7 +213,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {activeTab === 'MAP' && (
-        <div className="h-[750px] bg-white rounded-[3rem] overflow-hidden border border-gray-100 shadow-inner relative">
+        <div className="h-[calc(100vh-320px)] md:h-[750px] min-h-[500px] bg-white rounded-[3rem] overflow-hidden border border-gray-100 shadow-inner relative">
           <LiveMap 
             drivers={drivers} 
             jobs={jobs}
