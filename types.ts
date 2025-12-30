@@ -13,6 +13,12 @@ export interface Location {
 }
 
 export type ReceiptType = 'FUEL' | 'MAINTENANCE' | 'TOLL' | 'OTHER';
+export type SyncSpeed = 'FAST' | 'MEDIUM' | 'SLOW';
+
+export interface FleetSettings {
+  syncSpeed: SyncSpeed;
+  updatedAt: string;
+}
 
 export interface ReceiptEntry {
   id: string;
@@ -43,7 +49,7 @@ export interface Driver {
   id: string;
   name: string;
   vehicleNo: string;
-  password?: string; // Added for security
+  password?: string;
   status: 'ONLINE' | 'OFFLINE' | 'ON_JOB';
   phone: string;
   lastKnownLocation?: Location;

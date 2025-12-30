@@ -1,7 +1,6 @@
-
 import { Driver, Job, JobStatus } from './types';
 
-export const LOGO_URL = 'http://qgocargo.com/logo.png';
+export const LOGO_URL = 'https://qgocargo.com/logo.png';
 
 export const MOCK_DRIVERS: Driver[] = [
   { id: 'D1', name: 'Rajesh Kumar', vehicleNo: 'DL-1RA-1234', password: '1234', status: 'ON_JOB', phone: '+91 9876543210', lastKnownLocation: { lat: 28.6139, lng: 77.2090 } },
