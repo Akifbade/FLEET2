@@ -1,4 +1,27 @@
-import Parse from 'parse';
+/**
+ * DEPRECATED: Parse Server SDK has bundling issues with Vite
+ * Use parseRestAPI.ts instead for REST-based approach
+ */
+
+// Stub exports to maintain compatibility
+export const isParseConfigured = false;
+export const Parse = null;
+export const parseToJSON = () => ({});
+export const subscribeToCollection = () => () => {};
+export const addDocument = async () => ({});
+export const updateDocument = async () => ({});
+export const deleteDocument = async () => {};
+export const getDocument = async () => ({});
+export const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
+
+console.log('⚠️ parseServer.ts is deprecated. Using parseRestAPI.ts instead.');
 
 /**
  * Parse Server Configuration
