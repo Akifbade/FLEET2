@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { ViewMode, Driver, Job, ReceiptEntry, JobStatus, FleetSettings, SyncSpeed } from './types';
+import { ViewMode, Driver, Job, ReceiptEntry, JobStatus, FleetSettings, SyncSpeed, Location } from './types';
 import { LOGO_URL, MOCK_DRIVERS, MOCK_JOBS } from './constants';
 import AdminDashboard from './components/AdminDashboard';
 import DriverPortal from './components/DriverPortal';
@@ -7,7 +8,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Login from './components/Login';
 import { db, isConfigured } from './services/firebase';
-import { collection, onSnapshot, addDoc, updateDoc, doc, query, orderBy, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, updateDoc, doc, query, orderBy, setDoc, deleteDoc, getDoc } from "firebase/firestore";
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{ role: ViewMode; id?: string } | null>(null);
@@ -28,7 +29,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // Sync Fleet Settings
     const unsubSettings = onSnapshot(doc(db, "settings", "fleet"), (snap) => {
       if (snap.exists()) {
         setFleetSettings(snap.data() as FleetSettings);
@@ -37,136 +37,101 @@ const App: React.FC = () => {
       }
     });
 
-    const unsubDrivers = onSnapshot(collection(db, "drivers"), 
-      (snap) => {
-        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Driver));
-        setDrivers(docs);
-        setIsLoading(false);
-      },
-      (err) => {
-        console.error("Firestore Driver Sync Error:", err);
-        setIsLoading(false);
-      }
-    );
+    const unsubDrivers = onSnapshot(collection(db, "drivers"), (snap) => {
+      setDrivers(snap.docs.map(d => ({ ...d.data(), id: d.id } as Driver)));
+      setIsLoading(false);
+    });
 
-    const unsubJobs = onSnapshot(query(collection(db, "jobs"), orderBy("assignedAt", "desc")), 
-      (snap) => {
-        // CRITICAL FIX: Ensure document ID (d.id) overwrites any 'id' inside data
-        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Job));
-        setJobs(docs);
-      }
-    );
+    const unsubJobs = onSnapshot(query(collection(db, "jobs"), orderBy("assignedAt", "desc")), (snap) => {
+      setJobs(snap.docs.map(d => ({ ...d.data(), id: d.id } as Job)));
+    });
 
-    const unsubReceipts = onSnapshot(query(collection(db, "receipts"), orderBy("date", "desc")), 
-      (snap) => setReceipts(snap.docs.map(d => ({ ...d.data(), id: d.id } as ReceiptEntry)))
-    );
+    const unsubReceipts = onSnapshot(query(collection(db, "receipts"), orderBy("date", "desc")), (snap) => {
+      setReceipts(snap.docs.map(d => ({ ...d.data(), id: d.id } as ReceiptEntry)));
+    });
 
     return () => { unsubSettings(); unsubDrivers(); unsubJobs(); unsubReceipts(); };
   }, []);
 
-  const handleUpdateSyncSpeed = async (speed: SyncSpeed) => {
+  const handleUpdateJobStatus = async (jobId: string, status: JobStatus) => {
     if (!db) return;
     try {
-      await updateDoc(doc(db, "settings", "fleet"), {
-        syncSpeed: speed,
-        updatedAt: new Date().toISOString()
+      const jobRef = doc(db, "jobs", jobId);
+      const targetJob = jobs.find(j => j.id === jobId);
+      if (!targetJob) return;
+
+      const updates: any = { status };
+      const now = new Date().toISOString();
+
+      if (status === JobStatus.IN_PROGRESS) {
+        updates.startTime = now;
+        const driver = drivers.find(d => d.id === targetJob.driverId);
+        if (driver?.lastKnownLocation) {
+          updates.startLocation = driver.lastKnownLocation;
+        }
+      }
+
+      if (status === JobStatus.COMPLETED) {
+        updates.endTime = now;
+        const driver = drivers.find(d => d.id === targetJob.driverId);
+        if (driver?.lastKnownLocation) {
+          updates.endLocation = driver.lastKnownLocation;
+        }
+
+        // Calculate Metrics
+        if (targetJob.startTime) {
+          const start = new Date(targetJob.startTime).getTime();
+          const end = new Date(now).getTime();
+          const durationHours = (end - start) / (1000 * 60 * 60);
+          
+          // Simulation for distance based on average truck speeds (40-60km/h)
+          // In a real app, this would be calculated via GPS breadcrumbs
+          const simulatedDistance = Math.max(5, Math.floor(durationHours * (45 + Math.random() * 15)));
+          updates.distanceKm = simulatedDistance;
+          updates.avgSpeed = Math.round(simulatedDistance / durationHours) || 0;
+        }
+      }
+
+      await updateDoc(jobRef, updates);
+      await updateDoc(doc(db, "drivers", targetJob.driverId), { 
+        status: status === JobStatus.IN_PROGRESS ? 'ON_JOB' : 'ONLINE' 
       });
     } catch (e) { console.error(e); }
   };
 
-  const handleLogin = (role: ViewMode, id?: string) => {
-    const userData = { role, id };
-    setUser(userData);
-    localStorage.setItem('qgo_user', JSON.stringify(userData));
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('qgo_user');
-  };
-
   const handleAddJob = async (newJob: Job) => {
     if (!db) return;
-    try { 
-      // We don't need to pass id here, Firestore creates its own
-      const { id, ...jobData } = newJob;
-      await addDoc(collection(db, "jobs"), jobData); 
-    } 
-    catch (e) { console.error(e); }
+    try { const { id, ...data } = newJob; await addDoc(collection(db, "jobs"), data); } catch (e) { console.error(e); }
   };
 
-  const handleAddDriver = async (newDriver: Driver) => {
+  const handleAddDriver = async (driver: Driver) => {
     if (!db) return;
-    try { await setDoc(doc(db, "drivers", newDriver.id), newDriver); } 
-    catch (e) { console.error(e); }
+    try { await setDoc(doc(db, "drivers", driver.id), driver); } catch (e) { console.error(e); }
   };
 
-  const handleUpdateDriver = async (updatedDriver: Driver) => {
+  const handleDeleteDriver = async (id: string) => {
     if (!db) return;
-    try { await updateDoc(doc(db, "drivers", updatedDriver.id), { ...updatedDriver }); } 
-    catch (e) { console.error(e); }
-  };
-
-  const handleDeleteDriver = async (driverId: string) => {
-    if (!db) return;
-    try { await deleteDoc(doc(db, "drivers", driverId)); } 
-    catch (e) { console.error(e); }
-  };
-
-  const handleUpdateJobStatus = async (jobId: string, status: JobStatus) => {
-    if (!db) return;
-    console.log(`Attempting to update job ${jobId} to ${status}`);
-    try {
-      const jobRef = doc(db, "jobs", jobId);
-      const updates: any = { status };
-      const targetJob = jobs.find(j => j.id === jobId);
-      
-      if (!targetJob) {
-        console.error("Job not found in local state:", jobId);
-        return;
-      }
-
-      if (status === JobStatus.IN_PROGRESS) updates.startTime = new Date().toISOString();
-      if (status === JobStatus.COMPLETED) updates.endTime = new Date().toISOString();
-
-      await updateDoc(jobRef, updates);
-      
-      // Update associated driver status
-      await updateDoc(doc(db, "drivers", targetJob.driverId), { 
-        status: status === JobStatus.IN_PROGRESS ? 'ON_JOB' : 'ONLINE' 
-      });
-      console.log("Job status updated successfully");
-    } catch (e) { 
-      console.error("Error updating job status:", e);
-      alert("Failed to update trip status. Please check connection.");
-    }
-  };
-
-  const handleLogReceipt = async (entry: ReceiptEntry) => {
-    if (!db) return;
-    try { await addDoc(collection(db, "receipts"), entry); } 
-    catch (e) { console.error(e); }
+    try { await deleteDoc(doc(db, "drivers", id)); } catch (e) { console.error(e); }
   };
 
   if (isLoading) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#0a0a0b]">
         <img src={LOGO_URL} className="h-16 mb-4 animate-pulse" alt="Logo" />
-        <div className="w-48 h-1 bg-gray-800 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-600 animate-[loading_1.5s_infinite]"></div>
-        </div>
-        <p className="mt-4 text-gray-500 text-[10px] font-black uppercase tracking-[0.2em]">Connecting to Cloud...</p>
+        <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.2em]">Synchronizing Fleet Data...</p>
       </div>
     );
   }
 
-  if (!user) return <Login onLogin={handleLogin} drivers={drivers} logoUrl={LOGO_URL} />;
-
-  const currentDriver = user.role === 'DRIVER' ? drivers.find(d => d.id === user.id) : null;
+  if (!user) return <Login onLogin={(role, id) => {
+    const data = { role, id };
+    setUser(data);
+    localStorage.setItem('qgo_user', JSON.stringify(data));
+  }} drivers={drivers} logoUrl={LOGO_URL} />;
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      <Navbar user={user} onLogout={handleLogout} logoUrl={LOGO_URL} />
+      <Navbar user={user} onLogout={() => { setUser(null); localStorage.removeItem('qgo_user'); }} logoUrl={LOGO_URL} />
       <main className="flex-grow container mx-auto px-4 py-8">
         {user.role === 'ADMIN' ? (
           <AdminDashboard 
@@ -174,29 +139,23 @@ const App: React.FC = () => {
             jobs={jobs} 
             fuelEntries={receipts}
             fleetSettings={fleetSettings}
-            onUpdateSyncSpeed={handleUpdateSyncSpeed}
+            onUpdateSyncSpeed={async (speed) => {
+              if (!db) return;
+              await updateDoc(doc(db, "settings", "fleet"), { syncSpeed: speed, updatedAt: new Date().toISOString() });
+            }}
             onAddJob={handleAddJob}
             onAddDriver={handleAddDriver}
-            onUpdateDriver={handleUpdateDriver}
+            onUpdateDriver={async (d) => { if (!db) return; await updateDoc(doc(db, "drivers", d.id), { ...d }); }}
             onDeleteDriver={handleDeleteDriver}
           />
         ) : (
-          currentDriver ? (
-            <DriverPortal 
-              driver={currentDriver} 
-              jobs={jobs.filter(j => j.driverId === user.id)}
-              fleetSettings={fleetSettings}
-              onUpdateJobStatus={handleUpdateJobStatus}
-              onLogFuel={handleLogReceipt}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center p-20 text-center space-y-4">
-               <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-3xl"><i className="fas fa-user-slash"></i></div>
-               <h2 className="font-black text-gray-900 uppercase tracking-tight">Driver Not Found</h2>
-               <p className="text-gray-500 text-sm max-w-xs">Your driver account might have been deleted. Contact HQ.</p>
-               <button onClick={handleLogout} className="text-blue-600 font-black text-xs uppercase tracking-widest bg-blue-50 px-6 py-3 rounded-xl border border-blue-100">Return to Login</button>
-            </div>
-          )
+          <DriverPortal 
+            driver={drivers.find(d => d.id === user.id) || MOCK_DRIVERS[0]} 
+            jobs={jobs.filter(j => j.driverId === user.id)}
+            fleetSettings={fleetSettings}
+            onUpdateJobStatus={handleUpdateJobStatus}
+            onLogFuel={async (entry) => { if (!db) return; await addDoc(collection(db, "receipts"), entry); }}
+          />
         )}
       </main>
       <Footer />

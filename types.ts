@@ -40,7 +40,10 @@ export interface Job {
   status: JobStatus;
   startTime?: string;
   endTime?: string;
-  currentLocation?: Location;
+  startLocation?: Location;
+  endLocation?: Location;
+  distanceKm?: number;
+  avgSpeed?: number;
   assignedAt: string;
   description: string;
 }
