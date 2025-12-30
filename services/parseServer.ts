@@ -8,7 +8,7 @@ import Parse from 'parse';
 const PARSE_APP_ID = 'QGO_FLEET_APP_ID';
 const PARSE_JS_KEY = 'QGO_MASTER_KEY_SECURE_2025';
 // Use environment variable for flexible deployment
-const PARSE_SERVER_URL = import.meta.env.VITE_PARSE_SERVER_URL || 'http://148.230.107.155:1337/parse';
+const PARSE_SERVER_URL = import.meta.env.VITE_PARSE_SERVER_URL || 'https://qgocargo.cloud/parse';
 
 // Initialize Parse
 try {

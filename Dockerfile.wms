@@ -1,0 +1,4 @@
+﻿FROM ghcr.io/akifbade/wms-frontend:latest
+
+# Add Parse Server proxy configuration
+COPY default.conf /etc/nginx/conf.d/default.conf
