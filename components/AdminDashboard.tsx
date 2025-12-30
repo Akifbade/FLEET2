@@ -153,7 +153,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Tabs */}
       <div className="flex space-x-2 bg-gray-100/50 p-1.5 rounded-3xl overflow-x-auto scrollbar-hide">
         {(['OVERVIEW', 'MAP', 'REPORTS', 'DRIVERS', 'AI'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-white text-gray-900 shadow-md' : 'text-gray-400 hover:text-gray-700'}`}>
+          <button key={tab} onClick={() => { setActiveTab(tab); if (tab !== 'MAP') setSelectedJobForRadar(null); }} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-white text-gray-900 shadow-md' : 'text-gray-400 hover:text-gray-700'}`}>
             {tab}
           </button>
         ))}
@@ -213,7 +213,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {activeTab === 'MAP' && (
-        <div className="h-[calc(100vh-320px)] md:h-[750px] min-h-[500px] bg-white rounded-[3rem] overflow-hidden border border-gray-100 shadow-inner relative">
+        <div className="h-[calc(100vh-280px)] min-h-[600px] bg-white rounded-[3rem] overflow-hidden border border-gray-100 shadow-[0_40px_100px_-30px_rgba(0,0,0,0.1)] relative">
           <LiveMap 
             drivers={drivers} 
             jobs={jobs}
