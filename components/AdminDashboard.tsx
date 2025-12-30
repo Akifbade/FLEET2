@@ -30,6 +30,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [aiInsight, setAiInsight] = useState<string>('Analyzing fleet velocity and efficiency...');
   const [showJobModal, setShowJobModal] = useState(false);
   const [showDriverModal, setShowDriverModal] = useState(false);
+  const [showEditDriverModal, setShowEditDriverModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [addressMap, setAddressMap] = useState<Record<string, string>>({});
@@ -39,6 +41,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     tripType: TripType.LOCAL_MOVE, attachmentUrl: '' 
   });
   const [newDriver, setNewDriver] = useState({ id: '', name: '', vehicleNo: '', password: '', phone: '' });
+  const [editDriverData, setEditDriverData] = useState<Driver | null>(null);
 
   useEffect(() => {
     if (activeTab === 'AI') getPerformanceSummary(drivers, jobs, fuelEntries).then(setAiInsight);
@@ -77,12 +80,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const totalKm = completedJobs.reduce((acc, curr) => acc + (curr.distanceKm || 0), 0);
   const avgFleetSpeed = Math.round(completedJobs.reduce((acc, curr) => acc + (curr.avgSpeed || 0), 0) / (completedJobs.length || 1));
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setIsUploading(true);
-      const base64 = await fileToBase64(e.target.files[0]);
-      setNewJob({ ...newJob, attachmentUrl: base64 });
-      setIsUploading(false);
+  const handleOpenEdit = () => {
+    const driver = drivers.find(d => d.id === selectedDriverId);
+    if (driver) {
+      setEditDriverData({ ...driver });
+      setShowEditDriverModal(true);
+    }
+  };
+
+  const handleUpdateDriverSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editDriverData) {
+      onUpdateDriver(editDriverData);
+      setShowEditDriverModal(false);
     }
   };
 
@@ -289,7 +299,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        <p className="text-blue-600 font-black uppercase text-xs tracking-[0.2em]">{selectedDriver.vehicleNo} • Terminal Ref: {selectedDriver.id}</p>
                     </div>
                  </div>
-                 <button onClick={() => setSelectedDriverId(null)} className="text-gray-300 hover:text-rose-500 transition text-5xl"><i className="fas fa-times-circle"></i></button>
+                 <div className="flex items-center space-x-4">
+                    <button onClick={handleOpenEdit} className="w-12 h-12 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 transition shadow-sm border border-gray-200">
+                       <i className="fas fa-edit text-lg"></i>
+                    </button>
+                    <button onClick={() => setSelectedDriverId(null)} className="text-gray-300 hover:text-rose-500 transition text-5xl"><i className="fas fa-times-circle"></i></button>
+                 </div>
               </div>
               
               <div className="flex-grow overflow-y-auto p-10 space-y-12 scrollbar-hide">
@@ -379,9 +394,57 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        <p className="text-xl font-black tracking-[0.4em]">{selectedDriver.password}</p>
                     </div>
                  </div>
-                 <button onClick={() => onDeleteDriver(selectedDriver.id)} className="bg-rose-600 text-white px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-2xl hover:bg-rose-700">Decommission Unit</button>
+                 <button onClick={() => setShowDeleteConfirm(true)} className="bg-rose-600 text-white px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-2xl hover:bg-rose-700">Decommission Unit</button>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {showDeleteConfirm && selectedDriver && (
+        <div className="fixed inset-0 bg-rose-900/95 backdrop-blur-xl z-[400] flex items-center justify-center p-4">
+           <div className="bg-white max-w-md w-full rounded-[3rem] p-10 text-center shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-[2.5rem] flex items-center justify-center text-3xl mx-auto mb-6 border border-rose-100">
+                 <i className="fas fa-exclamation-triangle"></i>
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight mb-2">Strict Deletion Warning</h3>
+              <p className="text-gray-500 text-sm font-bold mb-8">Are you absolutely sure you want to decommission <span className="text-rose-600 font-black">{selectedDriver.name}</span>? This action is permanent and cannot be undone.</p>
+              <div className="grid grid-cols-2 gap-4">
+                 <button onClick={() => setShowDeleteConfirm(false)} className="py-4 rounded-2xl bg-gray-100 text-gray-900 font-black uppercase text-[10px] tracking-widest hover:bg-gray-200 transition">Cancel</button>
+                 <button onClick={() => { 
+                   onDeleteDriver(selectedDriver.id); 
+                   setShowDeleteConfirm(false); 
+                   setSelectedDriverId(null);
+                 }} className="py-4 rounded-2xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-rose-200 hover:bg-rose-700 transition">Confirm Delete</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* EDIT DRIVER MODAL */}
+      {showEditDriverModal && editDriverData && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[400] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8">
+            <div className="p-8 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+              <h3 className="font-black text-gray-900 uppercase tracking-tight text-xl">Edit Carrier Profile</h3>
+              <button onClick={() => setShowEditDriverModal(false)} className="text-gray-300 hover:text-rose-500 transition text-2xl"><i className="fas fa-times-circle"></i></button>
+            </div>
+            <form onSubmit={handleUpdateDriverSubmit} className="p-8 space-y-5">
+              <div className="space-y-1">
+                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Full Name</label>
+                 <input required value={editDriverData.name} onChange={e => setEditDriverData({...editDriverData, name: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold outline-none focus:border-blue-500" />
+              </div>
+              <div className="space-y-1">
+                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Vehicle Plate</label>
+                 <input required value={editDriverData.vehicleNo} onChange={e => setEditDriverData({...editDriverData, vehicleNo: e.target.value.toUpperCase()})} className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold outline-none uppercase focus:border-blue-500" />
+              </div>
+              <div className="space-y-1">
+                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Security PIN</label>
+                 <input required value={editDriverData.password} onChange={e => setEditDriverData({...editDriverData, password: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold outline-none focus:border-blue-500" />
+              </div>
+              <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-blue-200 mt-4 active:scale-95 transition">Commit Updates</button>
+            </form>
+          </div>
         </div>
       )}
 
